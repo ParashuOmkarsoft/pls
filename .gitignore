@@ -16,3 +16,5 @@ sitemap.xml.gz
 .DS_Store
 
 wp-content/themes/HTML5-Reset-Wordpress-Theme/sass/.sass-cache
+
+*.espressostorage
