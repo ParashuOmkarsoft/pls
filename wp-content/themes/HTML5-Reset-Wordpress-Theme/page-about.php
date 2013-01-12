@@ -22,11 +22,19 @@
 	
 	<?php if ($Query->have_posts()) : while ($Query->have_posts()) : $Query->the_post(); ?>
 	
-		<?php the_post_thumbnail('large', $img_attr); ?>
+		<div class="teacher">
 		
-		<h2><?php the_title(); ?></h2>
-		
-		<p><?php the_content(); ?></p>
+			<div class="teacher_image"><?php the_post_thumbnail('large', $img_attr); ?></div>
+			
+			<div class="teacher_content">
+
+				<h2><?php the_title(); ?></h2>
+				
+				<p><?php the_content(); ?></p>
+			
+			</div>
+			
+		</div>
 	
 	<?php endwhile; endif; ?>
 

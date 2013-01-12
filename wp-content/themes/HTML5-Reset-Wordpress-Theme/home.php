@@ -33,27 +33,38 @@
 					<?php endforeach; ?>
 				<?php endif; ?>
 				
+				<div class="row">
 				
-				<h2><?php the_field('home_title_sentance'); ?></h2>
-				
-				<?php the_content(); ?>
-				
-				<a href="<?php the_field('join_link'); ?>"><?php the_field('join_link_text'); ?></a>
-				
-				<a href="<?php the_field('feature_link_1'); ?>">
-					<h2><?php the_field('feature_link_1_title'); ?></h2>
-					<p><?php the_field('feature_link_1_description'); ?></p>
-				</a>
-				
-				<a href="<?php the_field('feature_link_2'); ?>">
-					<h2><?php the_field('feature_link_2_title'); ?></h2>
-					<p><?php the_field('feature_link_2_description'); ?></p>
-				</a>
-				
-				<a href="<?php the_field('feature_link_3'); ?>">
-					<h2><?php the_field('feature_link_3_title'); ?></h2>
-					<p><?php the_field('feature_link_3_description'); ?></p>
-				</a>
+					<div class="span7">
+						
+						<h2><?php the_field('home_title_sentance'); ?></h2>
+						
+						<?php the_content(); ?>
+						
+						<a href="<?php the_field('join_link'); ?>"><?php the_field('join_link_text'); ?></a>
+						
+					</div>
+					
+					<div class="span5">
+						
+						<a href="<?php the_field('feature_link_1'); ?>">
+							<h2><?php the_field('feature_link_1_title'); ?></h2>
+							<p><?php the_field('feature_link_1_description'); ?></p>
+						</a>
+						
+						<a href="<?php the_field('feature_link_2'); ?>">
+							<h2><?php the_field('feature_link_2_title'); ?></h2>
+							<p><?php the_field('feature_link_2_description'); ?></p>
+						</a>
+						
+						<a href="<?php the_field('feature_link_3'); ?>">
+							<h2><?php the_field('feature_link_3_title'); ?></h2>
+							<p><?php the_field('feature_link_3_description'); ?></p>
+						</a>
+						
+					</div>
+					
+				</div>
 
 			</div>
 
@@ -61,29 +72,39 @@
 
 		<?php endwhile; endif; ?>
 		
-		<div class="home_footer">
+		<div class="home_footer row">
 		
-			<h2>Testimonials</h2>
-		
-			<?php $queryargs = "post_type=testimonial&posts_per_page=1&order=ASC&orderby=rand"; ?>
-			
-			<?php $Query = new WP_Query($queryargs); ?>
-			
-			<?php if ($Query->have_posts()) : while ($Query->have_posts()) : $Query->the_post(); ?>
-			
-				<p><?php the_field('testimonial'); ?></p>
+			<div class="span4">
 				
-				<p>- <?php the_field('student_name'); ?></p>
+				<h2>Testimonials</h2>
+				
+				<?php $queryargs = "post_type=testimonial&posts_per_page=1&order=ASC&orderby=rand"; ?>
+				
+				<?php $Query = new WP_Query($queryargs); ?>
+				
+				<?php if ($Query->have_posts()) : while ($Query->have_posts()) : $Query->the_post(); ?>
+				
+					<p><?php the_field('testimonial'); ?></p>
+					
+					<p>- <?php the_field('student_name'); ?></p>
+				
+				<?php endwhile; endif; ?>
+				
+			</div>
 			
-			<?php endwhile; endif; ?>
+			<div class="span4">
+				
+				<h2>Upcoming Classes</h2>
+				
+			</div>
 			
-			<h2>Upcoming Classes</h2>
-			
-			<h2>Connect with PLS</h2>
+			<div class="span4">
+				
+				<h2>Connect with PLS</h2>
+				
+			</div>
 		
 		</div>
-		
-	
 
 <?php get_footer(); ?>
 
