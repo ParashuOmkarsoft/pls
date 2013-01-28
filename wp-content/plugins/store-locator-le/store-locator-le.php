@@ -3,7 +3,7 @@
 Plugin Name: Store Locator Plus
 Plugin URI: http://www.charlestonsw.com/products/store-locator-plus/
 Description: Manage multiple locations with ease. Map stores or other points of interest with ease via Gooogle Maps.  This is a highly customizable, easily expandable, enterprise-class location management system.
-Version: 3.8.6
+Version: 3.8.12
 Author: Charleston Software Associates
 Author URI: http://www.charlestonsw.com
 License: GPL3
@@ -32,8 +32,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-if (isset($_SERVER['SERVER_NAME']) && ($_SERVER['SERVER_NAME']==='d.csa.com')){
-    error_reporting(E_ALL);
+if ( 
+        (get_option('blogname'          ,'') === 'CSA Testing'    ) &&
+        (get_option('blogdescription'  ,'') === 'Lance Testing' ) 
+    ){
+    error_reporting(-1);
 }
 
 

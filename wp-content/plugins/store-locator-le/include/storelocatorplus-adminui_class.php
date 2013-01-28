@@ -17,7 +17,8 @@ if (! class_exists('SLPlus_AdminUI')) {
          ******************************/
         public $addingLocation = false;
         public $currentLocation = array();
-        public $parent = null;       
+        public $parent = null;
+        public $plugin = null;
         public $styleHandle = 'csl_slplus_admin_css';
 
         /*************************************
@@ -44,12 +45,15 @@ if (! class_exists('SLPlus_AdminUI')) {
             if (!isset($this->parent) || ($this->parent == null)) {
                 global $slplus_plugin;
                 $this->parent = $slplus_plugin;
+                $this->plugin = $slplus_plugin;
             }
             return (isset($this->parent) && ($this->parent != null));
         }
 
         /**
          * Add an address into the SLP locations database.
+         *
+         * Returns 'added' or 'duplicate'
          * 
          * @global type $wpdb
          * @param type $fields
@@ -57,13 +61,30 @@ if (! class_exists('SLPlus_AdminUI')) {
          * @param type $theaddress
          *
          */
-        function add_this_addy($fields,$sl_values,$theaddress) {
+        function add_this_addy($fields,$sl_values,$theaddress,$skipdupes=false,$storename='') {
             global $wpdb;
             $fields=substr($fields, 0, strlen($fields)-1);
             $sl_values=substr($sl_values, 0, strlen($sl_values)-1);
+
+            // Dupe check?
+            //
+            if ($skipdupes) {
+                $checkDupeQuery =
+                'SELECT 1 FROM '. $wpdb->prefix . 'store_locator ' .
+                    ' WHERE ' .
+                        "CONCAT_WS(', ',sl_store,sl_address,sl_address2,sl_city,sl_state,sl_zip,sl_country)".
+                        "='$storename, $theaddress' " .
+                      'LIMIT 1'
+                        ;
+                $wpdb->query($checkDupeQuery);
+                if ($wpdb->num_rows == 1) {
+                    return 'duplicate';
+                }
+            }
+
             $wpdb->query("INSERT into ". $wpdb->prefix . "store_locator ($fields) VALUES ($sl_values);");
             $this->do_geocoding($theaddress);
-
+            return 'added';
         }
 
         /**
@@ -707,7 +728,7 @@ if (! class_exists('SLPlus_AdminUI')) {
          * @param type $storePageID
          * @return type
          */
-        function slpRenderCreatePageButton($locationID=-1,$storePageID=-1) {
+        static function slpRenderCreatePageButton($locationID=-1,$storePageID=-1) {
             if ($locationID < 0) { return; }            
             $slpPageClass = (($storePageID>0)?'haspage_icon' : 'createpage_icon');
             print "<a   class='action_icon $slpPageClass' 
@@ -797,89 +818,13 @@ if (! class_exists('SLPlus_AdminUI')) {
 
                 /** Bulk Upload
                  **/
-                } elseif ( isset($_FILES['csvfile']['name']) &&
-                       ($_FILES['csvfile']['name']!='')  &&
-                        ($_FILES['csvfile']['size'] > 0)
-                    ) {
-                    add_filter('upload_mimes', array('SLPlus_AdminUI','custom_upload_mimes'));
-
-                    // Get the type of the uploaded file. This is returned as "type/extension"
-                    $arr_file_type = wp_check_filetype(basename($_FILES['csvfile']['name']));
-                    if ($arr_file_type['type'] == 'text/csv') {
-
-                                // Save the file to disk
-                                //
-                                $updir = wp_upload_dir();
-                                $updir = $updir['basedir'].'/slplus_csv';
-                                if(!is_dir($updir)) {
-                                    mkdir($updir,0755);
-                                }
-                                if (move_uploaded_file($_FILES['csvfile']['tmp_name'],
-                                        $updir.'/'.$_FILES['csvfile']['name'])) {
-                                        $reccount = 0;
-
-                                        $adle_setting = ini_get('auto_detect_line_endings');
-                                        ini_set('auto_detect_line_endings', true);
-                                        if (($handle = fopen($updir.'/'.$_FILES['csvfile']['name'], "r")) !== FALSE) {
-                                            $fldNames = array('sl_store','sl_address','sl_address2','sl_city','sl_state',
-                                                            'sl_zip','sl_country','sl_tags','sl_description','sl_url',
-                                                            'sl_hours','sl_phone','sl_email','sl_image','sl_fax');
-                                            $maxcols = count($fldNames);
-                                            while (($data = fgetcsv($handle)) !== FALSE) {
-                                                $num = count($data);
-                                                if ($num <= $maxcols) {
-                                                    $fieldList = '';
-                                                    $sl_valueList = '';
-                                                    $this_addy = '';
-                                                    for ($fldno=0; $fldno < $num; $fldno++) {
-                                                        $fieldList.=$fldNames[$fldno].',';
-                                                        $sl_valueList.="\"".stripslashes($this->slp_escape($data[$fldno]))."\",";
-                                                        if (($fldno>=1) && ($fldno<=6)) {
-                                                            $this_addy .= $data[$fldno] . ', ';
-                                                        }
-                                                    }
-                                                    $this_addy = substr($this_addy, 0, strlen($this_addy)-2);
-                                                    $slplus_plugin->AdminUI->add_this_addy($fieldList,$sl_valueList,$this_addy);
-                                                    sleep(0.5);
-                                                    $reccount++;
-                                                } else {
-                                                     print "<div class='updated fade'>".
-                                                        __('The CSV file has too many fields.',
-                                                            SLPLUS_PREFIX
-                                                            );
-                                                     print ' ';
-                                                     printf(__('Got %d expected less than %d.', SLPLUS_PREFIX),
-                                                        $num,$maxcols);
-                                                     print '</div>';
-                                                }
-                                            }
-                                            fclose($handle);
-                                        }
-                                        ini_set('auto_detect_line_endings', $adle_setting);
-
-
-                                        if ($reccount > 0) {
-                                            print "<div class='updated fade'>".
-                                                    sprintf("%d",$reccount) ." " .
-                                                    __("locations added succesfully.",SLPLUS_PREFIX) . '</div>';
-                                        }
-
-                                // Could not save
-                                } else {
-                                        print "<div class='updated fade'>".
-                                        __("File could not be saved, check the plugin directory permissions:",SLPLUS_PREFIX) .
-                                            "<br/>" . $updir.
-
-                                '.</div>';
-                        }
-
-                        // Not CSV Format Warning
-                    } else {
-                        print "<div class='updated fade'>".
-                            __("Uploaded file needs to be in CSV format.",SLPLUS_PREFIX) .
-                            " Type was " . $arr_file_type['type'] .
-                            '.</div>';
-                    }
+                } elseif ( 
+                    isset($this->plugin->ProPack)     &&
+                    isset($_FILES['csvfile']['name']) &&
+                    ($_FILES['csvfile']['name']!='')  &&
+                    ($_FILES['csvfile']['size'] > 0)
+                   ) {
+                    $this->plugin->ProPack->bulk_upload_processing();
                 }
 
                 $base=get_option('siteurl');
@@ -1103,13 +1048,8 @@ if (! class_exists('SLPlus_AdminUI')) {
 
                 // Bulk upload form
                 //
-                if ($addform && ($slplus_plugin->license->packages['Pro Pack']->isenabled)) {
-                    $content .=
-                        '<div class="slp_bulk_upload_div">' .
-                        '<h2>'.__('Bulk Upload', SLPLUS_PREFIX).'</h2>'.
-                        '<input type="file" name="csvfile" value="" id="bulk_file" size="60"><br/>' .
-                        "<input type='submit' value='".__("Upload Locations", SLPLUS_PREFIX)."' class='button-primary'>".
-                        '</div>';
+                if ($addform) {
+                    $content .= apply_filters('slp_add_location_form_footer', '');
                 }
 
                 $content .= '</form>';
@@ -1118,65 +1058,101 @@ if (! class_exists('SLPlus_AdminUI')) {
          }
 
         /**
-         * Allows WordPress to process csv file types
-         *
-         */
-        function custom_upload_mimes ( $existing_mimes=array() ) {
-            $existing_mimes['csv'] = 'text/csv';
-            return $existing_mimes;
-        }
-
-        /**
-         * Render an icon selector for the icon images store in the SLP plugin icon directory.
+         * Return the icon selector HTML for the icon images in saved icons and default icon directories.
          *
          * @param type $inputFieldID
          * @param type $inputImageID
          * @return string
          */
-         function rendorIconSelector($inputFieldID = null, $inputImageID = null) {
+         function CreateIconSelector($inputFieldID = null, $inputImageID = null) {
             if (!$this->setParent()) { return 'could not set parent'; }
             if (($inputFieldID == null) || ($inputImageID == null)) { return ''; }
+
+
             $htmlStr = '';
+            $files=array();
+            $fqURL=array();
 
-            $directories = apply_filters('slp_icon_directories',array(SLPLUS_ICONDIR, SLPLUS_UPLOADDIR."/saved-icons/"));
-            foreach ($directories as $directory) {
-                if (is_dir($directory)) {
-                    if ($iconDir=opendir($directory)) {
-                        $iconURL = (($directory === SLPLUS_ICONDIR)?SLPLUS_ICONURL:SLPLUS_UPLOADURL.'/saved-icons/');
-                        $files=array();
-                        while ($files[] = readdir($iconDir));
-                        sort($files);
-                        closedir($iconDir);
 
-                        foreach ($files as $an_icon) {
-                            if (
-                                (preg_match('/\.(png|gif|jpg)/i', $an_icon) > 0) &&
-                                (preg_match('/shadow\.(png|gif|jpg)/i', $an_icon) <= 0)
-                                ) {
-                                $htmlStr .=
-                                    "<div class='slp_icon_selector_box'>".
-                                        "<img class='slp_icon_selector'
-                                             src='".$iconURL.$an_icon."'
-                                             onclick='".
-                                                "document.getElementById(\"".$inputFieldID."\").value=this.src;".
-                                                "document.getElementById(\"".$inputImageID."\").src=this.src;".
-                                             "'>".
-                                     "</div>"
-                                     ;
-                            }
+            // If we already got a list of icons and URLS, just use those
+            //
+            if (
+                isset($this->plugin->data['iconselector_files']) &&
+                isset($this->plugin->data['iconselector_urls'] ) 
+               ) {
+                $files = $this->plugin->data['iconselector_files'];
+                $fqURL = $this->plugin->data['iconselector_urls'];
+
+            // If not, build the icon info but remember it for later
+            // this helps cut down looping directory info twice (time consuming)
+            // for things like home and end icon processing.
+            //
+            } else {
+
+                // Load the file list from our directories
+                //
+                // using the same array for all allows us to collapse files by
+                // same name, last directory in is highest precedence.
+                $iconAssets = apply_filters('slp_icon_directories',
+                        array(
+                                array('dir'=>SLPLUS_UPLOADDIR.'saved-icons/',
+                                      'url'=>SLPLUS_UPLOADURL.'saved-icons/'
+                                     ),
+                                array('dir'=>SLPLUS_ICONDIR,
+                                      'url'=>SLPLUS_ICONURL
+                                     )
+                            )
+                        );
+                $fqURLIndex = 0;
+                foreach ($iconAssets as $icon) {
+                    if (is_dir($icon['dir'])) {
+                        if ($iconDir=opendir($icon['dir'])) {
+                            $fqURL[] = $icon['url'];
+                            while ($filename = readdir($iconDir)) {
+                                if (strpos($filename,'.')===0) { continue; }
+                                $files[$filename] = $fqURLIndex;
+                            };
+                            closedir($iconDir);
+                            $fqURLIndex++;
+                        } else {
+                            $this->parent->notifications->add_notice(
+                                    9,
+                                    sprintf(
+                                            __('Could not read icon directory %s',SLPLUS_PREFIX),
+                                            $directory
+                                            )
+                                    );
+                             $this->parent->notifications->display();
                         }
-                    } else {
-                        $this->parent->notifications->add_notice(
-                                9,
-                                sprintf(
-                                        __('Could not read icon directory %s',SLPLUS_PREFIX),
-                                        $directory
-                                        )
-                                );
-                         $this->parent->notifications->display();
-                    }
-               }
+                   }
+                }
+                ksort($files);
+                $this->plugin->data['iconselector_files'] = $files;
+                $this->plugin->data['iconselector_urls']  = $fqURL;
             }
+
+            // Build our icon array now that we have a full file list.
+            //
+            foreach ($files as $filename => $fqURLIndex) {
+                if (
+                    (preg_match('/\.(png|gif|jpg)/i', $filename) > 0) &&
+                    (preg_match('/shadow\.(png|gif|jpg)/i', $filename) <= 0)
+                    ) {
+                    $htmlStr .=
+                        "<div class='slp_icon_selector_box'>".
+                            "<img class='slp_icon_selector'
+                                 src='".$fqURL[$fqURLIndex].$filename."'
+                                 onclick='".
+                                    "document.getElementById(\"".$inputFieldID."\").value=this.src;".
+                                    "document.getElementById(\"".$inputImageID."\").src=this.src;".
+                                 "'>".
+                         "</div>"
+                         ;
+                }
+            }
+
+            // Wrap it in a div
+            //
             if ($htmlStr != '') {
                 $htmlStr = '<div id="'.$inputFieldID.'_icon_row" class="slp_icon_row">'.$htmlStr.'</div>';
 

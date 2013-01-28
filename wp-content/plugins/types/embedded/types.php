@@ -7,11 +7,15 @@ if (!defined('WPCF_VERSION')) {
 define('WPCF_EMBEDDED_ABSPATH', dirname(__FILE__));
 define('WPCF_EMBEDDED_INC_ABSPATH', WPCF_EMBEDDED_ABSPATH . '/includes');
 define('WPCF_EMBEDDED_RES_ABSPATH', WPCF_EMBEDDED_ABSPATH . '/resources');
+if (!defined('WPCF_DEBUG')) {
+    define('WPCF_DEBUG', false);
+}
 
 if (!defined('ICL_COMMON_FUNCTIONS')) {
     require_once WPCF_EMBEDDED_ABSPATH . '/common/functions.php';
 }
-require_once WPCF_EMBEDDED_INC_ABSPATH . '/footer-credit.php';
+// TODO Remove
+//require_once WPCF_EMBEDDED_INC_ABSPATH . '/footer-credit.php';
 
 wpcf_embedded_after_setup_theme_hook();
 
@@ -40,14 +44,16 @@ function wpcf_embedded_after_setup_theme_hook() {
  */
 function wpcf_embedded_init() {
     $locale = get_locale();
-    load_textdomain('wpcf', WPCF_EMBEDDED_ABSPATH . '/locale/types-' . $locale . '.mo');
+    load_textdomain('wpcf',
+            WPCF_EMBEDDED_ABSPATH . '/locale/types-' . $locale . '.mo');
     if (!defined('WPV_VERSION')) {
-        load_textdomain('wpv-views', WPCF_EMBEDDED_ABSPATH . '/locale/locale-views/views-' . $locale . '.mo');
+        load_textdomain('wpv-views',
+                WPCF_EMBEDDED_ABSPATH . '/locale/locale-views/views-' . $locale . '.mo');
     }
 
     // Define necessary constants if plugin is not present
     if (!defined('WPCF_VERSION')) {
-        define('WPCF_VERSION', '1.0');
+        define('WPCF_VERSION', '1.1.3.4');
         define('WPCF_META_PREFIX', 'wpcf-');
         define('WPCF_EMBEDDED_RELPATH', icl_get_file_relpath(__FILE__));
     } else {
@@ -107,9 +113,11 @@ function wpcf_translate($name, $string, $context = 'plugin Types') {
  * @param type $name
  * @param type $value 
  */
-function wpcf_translate_register_string($context, $name, $value, $allow_empty_value = false) {
+function wpcf_translate_register_string($context, $name, $value,
+        $allow_empty_value = false) {
     if (function_exists('icl_register_string')) {
-        icl_register_string($context, $name, stripslashes($value), $allow_empty_value);
+        icl_register_string($context, $name, stripslashes($value),
+                $allow_empty_value);
     }
 }
 
@@ -141,7 +149,7 @@ function wpcf_embedded_check_import() {
         }
         if ($timestamp > get_option('wpcf-types-embedded-import', 0)) {
             if (!$auto_import) {
-                wp_enqueue_script('wpcf-fields-edit',
+                wp_enqueue_script('wpcf-js',
                         WPCF_EMBEDDED_RES_RELPATH . '/js/basic.js',
                         array('jquery', 'jquery-ui-sortable', 'jquery-ui-draggable'),
                         WPCF_VERSION);
@@ -370,25 +378,46 @@ function wpcf_pr_post_get_has($post_id, $post_type_q = null) {
 function types_child_posts($post_type, $args = array()) {
     require_once WPCF_EMBEDDED_INC_ABSPATH . '/fields.php';
     require_once WPCF_EMBEDDED_INC_ABSPATH . '/fields-post.php';
-    global $post;
+    global $post, $wp_post_types;
+    // WP allows querying inactive post types
+    if (!isset($wp_post_types[$post_type])
+            || !$wp_post_types[$post_type]->publicly_queryable) {
+        return array();
+    }
     $defaults = array(
         'post_type' => $post_type,
         'numberposts' => -1,
         'post_status' => null,
         'meta_key' => '_wpcf_belongs_' . $post->post_type . '_id',
         'meta_value' => $post->ID,
+        'suppress_filters' => false,
     );
     $args = wp_parse_args($args, $defaults);
+    $args = apply_filters('types_child_posts_args', $args);
     $child_posts = get_posts($args);
     foreach ($child_posts as $child_post_key => $child_post) {
+        if ($child_posts[$child_post_key]->post_status=='trash')
+        {
+            unset($child_posts[$child_post_key]);
+            continue;
+        }
         $child_posts[$child_post_key]->fields = array();
         $groups = wpcf_admin_post_get_post_groups_fields($child_post);
         foreach ($groups as $group) {
             if (!empty($group['fields'])) {
                 // Process fields
                 foreach ($group['fields'] as $k => $field) {
-                    $child_posts[$child_post_key]->fields[$k] = get_post_meta($child_post->ID,
-                            wpcf_types_get_meta_prefix($field) . $field['slug'], true);
+                    if (isset($field['data']['repetitive'])&&$field['data']['repetitive'])
+                        $child_posts[$child_post_key]->fields[$k] = get_post_meta($child_post->ID,
+                                wpcf_types_get_meta_prefix($field) . $field['slug'],
+                                false); // get all field instances
+                    else
+                        $child_posts[$child_post_key]->fields[$k] = get_post_meta($child_post->ID,
+                                wpcf_types_get_meta_prefix($field) . $field['slug'],
+                                true); // get single field instance
+                    // handle checkboxes which are one value serialized
+                    if ($field['type']=='checkboxes' && isset($child_posts[$child_post_key]->fields[$k]))
+                        $child_posts[$child_post_key]->fields[$k]=maybe_unserialize($child_posts[$child_post_key]->fields[$k]);
                 }
             }
         }
@@ -403,8 +432,12 @@ function wpcf_get_settings($specific = false) {
     $defaults = array(
         'add_resized_images_to_library' => 0,
         'register_translations_on_import' => 1,
+        'images_remote' => 0,
+        'images_remote_cache_time' => '36',
+        'help_box' => 'by_types',
     );
     $settings = wp_parse_args(get_option('wpcf_settings', array()), $defaults);
+    $settings = apply_filters('types_settings', $settings);
     if ($specific) {
         return isset($settings[$specific]) ? $settings[$specific] : false;
     }
@@ -418,14 +451,14 @@ function wpcf_save_settings($settings) {
     update_option('wpcf_settings', $settings);
 }
 
-
 /**
  * Check if it can be repetitive
  * @param type $field
  * @return type 
  */
 function wpcf_admin_can_be_repetitive($type) {
-    return !in_array($type, array('checkbox', 'checkboxes', 'wysiwyg'));
+    return !in_array($type,
+                    array('checkbox', 'checkboxes', 'wysiwyg', 'radio', 'select'));
 }
 
 /**
@@ -434,6 +467,28 @@ function wpcf_admin_can_be_repetitive($type) {
  * @return type 
  */
 function wpcf_admin_is_repetitive($field) {
-    return isset($field['data']['repetitive']) && !in_array($field['type'],
-                    array('checkbox', 'checkboxes', 'wysiwyg'));
+    if (!isset($field['data']['repetitive']) || !isset($field['type'])) {
+        return false;
+    }
+    $check = intval($field['data']['repetitive']);
+    return !empty($check)
+            && wpcf_admin_can_be_repetitive($field['type']);
+}
+
+/**
+ * Returns unique ID.
+ * 
+ * @staticvar array $cache
+ * @param type $cache_key
+ * @return type 
+ */
+function wpcf_unique_id($cache_key) {
+    $cache_key = md5(strval($cache_key) . strval(time()));
+    static $cache = array();
+    if (!isset($cache[$cache_key])) {
+        $cache[$cache_key] = 1;
+    } else {
+        $cache[$cache_key] += 1;
+    }
+    return $cache_key . '-' . $cache[$cache_key];
 }

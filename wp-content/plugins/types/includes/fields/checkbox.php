@@ -14,12 +14,14 @@
  * 'raw' => 'true'|'false' (display raw data stored in DB, default false)
  * 'output' => 'html' (wrap data in HTML, optional)
  * 'show_name' => 'true' (show field name before value e.g. My checkbox: $value)
- * 'checked_html' => base64_encode('<img src="image-on.png" />')
- * 'unchecked_html' => base64_encode('<img src="image-off.png" />')
+ * 'state' => 'checked' or 'unchecked' (display the content of the shortcode depending on the state)
  *
  * Example usage:
  * With a short code use [types field="my-checkbox"]
  * In a theme use types_render_field("my-checkbox", $parameters)
+ *
+ * Link:
+ * <a href="http://wp-types.com/documentation/functions/checkbox/">Types checkbox custom field</a>
  * 
  */
 
@@ -51,6 +53,29 @@ function wpcf_fields_checkbox_insert_form($form_data) {
         '#title' => __('Value to store', 'wpcf'),
         '#name' => 'set_value',
         '#value' => 1,
+    );
+    $cb_migrate_save = !empty($form_data['slug']) ? 'wpcfCbSaveEmptyMigrate(jQuery(this), \'' . $form_data['slug'] . '\', \'\', \'' . wp_create_nonce('cb_save_empty_migrate') . '\', \'save_check\');' : '';
+    $cb_migrate_do_not_save = !empty($form_data['slug']) ? 'wpcfCbSaveEmptyMigrate(jQuery(this), \'' . $form_data['slug'] . '\', \'\', \'' . wp_create_nonce('cb_save_empty_migrate') . '\', \'do_not_save_check\');' : '';
+    $update_response = !empty($form_data['slug']) ? '<div id="wpcf-cb-save-empty-migrate-response-'
+        . $form_data['slug'] . '" class="wpcf-cb-save-empty-migrate-response"></div>' : '<div class="wpcf-cb-save-empty-migrate-response"></div>';
+    $form['save_empty'] = array(
+        '#type' => 'radios',
+        '#name' => 'save_empty',
+        '#default_value' => !empty($form_data['data']['save_empty']) ? $form_data['data']['save_empty'] : 'no',
+        '#options' => array(
+            'yes' => array(
+                '#title' => __('save 0 to the database', 'wpcf'),
+                '#value' => 'yes',
+                '#attributes' => array('class' => 'wpcf-cb-save-empty-migrate', 'onclick' => $cb_migrate_save),
+            ),
+            'no' => array(
+                '#title' => __("don't save anything to the database", 'wpcf'),
+                '#value' => 'no',
+                '#attributes' => array('class' => 'wpcf-cb-save-empty-migrate', 'onclick' => $cb_migrate_do_not_save),
+            ),
+        ),
+        '#description' => '<strong>' . __('When unchecked:', 'wpcf') . '</strong>',
+        '#after' => $update_response,
     );
     $form['checked'] = array(
         '#type' => 'checkbox',
@@ -91,6 +116,10 @@ function wpcf_fields_checkbox_insert_form($form_data) {
         '#title' => __('Selected:', 'wpcf'),
         '#name' => 'display_value_selected',
         '#value' => '',
+    );
+    $form['help'] = array(
+        '#type' => 'markup',
+        '#markup' => '<p style="text-align:right"><a href="http://wp-types.com/documentation/functions/checkbox/" target="_blank">' . __('Checkbox help', 'wpcf') . '</a></p>',
     );
     return $form;
 }

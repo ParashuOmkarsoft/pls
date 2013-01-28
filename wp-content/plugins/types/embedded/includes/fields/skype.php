@@ -29,7 +29,7 @@ function wpcf_fields_skype_meta_box_form($field) {
     $form = array();
     add_filter('wpcf_fields_shortcode_slug_' . $field['slug'],
             'wpcf_fields_skype_shortcode_filter', 10, 2);
-    $rand = mt_rand();
+    $rand = wpcf_unique_id(serialize($field));
     $form['skypename'] = array(
         '#type' => 'textfield',
         '#value' => isset($field['value']['skypename']) ? $field['value']['skypename'] : '',
@@ -59,7 +59,8 @@ function wpcf_fields_skype_meta_box_form($field) {
             $preview_style);
 
     // Set button
-    if (isset($field['disable'])) {
+    if (isset($field['disable'])
+            || (isset($field['wpml_action']) && $field['wpml_action'] == 'copy')) {
         $edit_button = '';
     } else {
         $edit_button = '<br />'
@@ -382,17 +383,17 @@ function wpcf_fields_skype_get_button_image($skypename, $template = '') {
  * @param type $params 
  */
 function wpcf_fields_skype_view($params) {
-    if (!isset($params['field_value']['skypename'])) {
+    if (empty($params['field_value']['skypename'])) {
         return '__wpcf_skip_empty';
     }
-    if ($params['style'] == 'raw') {
+    if (isset($params['style']) && $params['style'] == 'raw') {
         return $params['field_value']['skypename'];
     }
     // Style can be overrided by params (shortcode)
     if (!isset($params['field_value']['style'])) {
         $params['field_value']['style'] = '';
     }
-    $style = (!empty($params['style']) && $params['style'] != 'default') ? $params['style'] : $params['field_value']['style'];
+    $style = (isset($params['style'])&&!empty($params['style']) && $params['style'] != 'default') ? $params['style'] : $params['field_value']['style'];
     $content = wpcf_fields_skype_get_button($params['field_value']['skypename'],
             $style);
     return $content;

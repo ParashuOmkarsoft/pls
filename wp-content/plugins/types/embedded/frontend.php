@@ -54,7 +54,11 @@ function wpcf_shortcode($atts, $content = null, $code = '') {
 function types_render_field($field_id, $params, $content = null, $code = '') {
     require_once WPCF_EMBEDDED_INC_ABSPATH . '/fields.php';
     global $post;
-
+    //set post_id 
+    $post_id = $post->ID; 
+    if(isset($params['post_id']) && !empty($params['post_id']))
+    { $post_id = $params['post_id']; }
+    
     // Get field
     $field = wpcf_fields_get_field_by_slug($field_id);
     if (empty($field)) {
@@ -63,14 +67,18 @@ function types_render_field($field_id, $params, $content = null, $code = '') {
         }
         global $wplogger;
         $wplogger->log('types_render_field call for missing field \''
-                . $field_id. '\'', WPLOG_DEBUG);
+                . $field_id . '\'', WPLOG_DEBUG);
         return '';
     }
 
     // See if repetitive
     if (wpcf_admin_is_repetitive($field)) {
-        $meta = get_post_meta($post->ID,
+        $meta = get_post_meta($post_id ,
                 wpcf_types_get_meta_prefix($field) . $field['slug'], false);
+        // Sometimes if meta is empty - array(0 => '') is returned
+        if ((count($meta) == 1 && strval($meta[0]) == '')) {
+            return '';
+        }
         if (!empty($meta)) {
             $output = '';
 
@@ -113,7 +121,7 @@ function types_render_field($field_id, $params, $content = null, $code = '') {
             return '';
         }
     } else {
-        $params['field_value'] = get_post_meta($post->ID,
+        $params['field_value'] = get_post_meta($post_id ,
                 wpcf_types_get_meta_prefix($field) . $field['slug'], true);
         if ($params['field_value'] == '' && $field['type'] != 'checkbox') {
             return '';
@@ -146,11 +154,15 @@ function types_render_field_single($field, $params, $content = null, $code = '')
     $type = wpcf_fields_type_action($field['type']);
 
     // If 'class' or 'style' parameters are set - force HTML output
-    if ((!empty($params['class']) || !empty($params['style'])) && $field['type'] != 'date') {
+    if (((isset($params['class'])&&!empty($params['class'])) || (isset($params['style'])&&!empty($params['style']))) && $field['type'] != 'date') {
         $params['output'] = 'html';
     }
 
     // Apply filters to field value
+    if (is_string($params['field_value'])) {
+        $params['field_value'] = trim($params['field_value']);
+    }
+    
     $params['field_value'] = apply_filters('wpcf_fields_value_display',
             $params['field_value'], $params);
     $params['field_value'] = apply_filters('wpcf_fields_slug_' . $field['slug'] . '_value_display',
@@ -320,6 +332,11 @@ function wpcf_frontend_wrap_field_value($field, $content, $params = array()) {
                         array('file', 'image', 'email', 'url', 'wysiwyg'))) {
             $class[] = $params['class'];
         }
+        
+        // add some default
+        if (!array_key_exists('style',$params))
+            $params['style']='';
+            
         $class[] = 'wpcf-field-value wpcf-field-' . $field['type']
                 . '-value wpcf-field-' . $field['slug'] . '-value';
         if ($field['type'] == 'skype' || $field['type'] == 'image' || ($field['type'] == 'date' && $params['style'] == 'calendar')
@@ -344,4 +361,97 @@ function wpcf_frontend_wrap_field_value($field, $content, $params = array()) {
     } else {
         return stripslashes($content);
     }
+}
+
+// Add a filter to handle Views queries with checkboxes.
+
+add_filter('wpv_filter_query', 'wpcf_views_query', 12, 2); // after custom fields.
+
+function wpcf_views_query($query, $view_settings) {
+    
+    $meta_filter_required = false;
+    
+    $opt = get_option('wpcf-fields');
+    
+    if (isset($query['meta_query'])) {
+        foreach ($query['meta_query'] as $index => $meta) {
+            $field_name = $meta['key'];
+            if (_wpcf_is_checkboxes_field($field_name)) {
+                
+                // We'll use SQL regexp to find the checked items.
+                // Note that we are creating something here that
+                // then gets modified to a proper SQL REGEXP in
+                // the get_meta_sql filter.
+
+                $field_name = substr($field_name, 5);
+
+                $meta_filter_required = true;
+                $meta['compare'] = '=';
+                
+				$values = explode(',', $meta['value']);
+                
+                $meta['value'] = ' REGEXP(';
+
+                $options = $opt[$field_name]['data']['options'];
+
+                $count = 0;
+                foreach ($values as $value) {
+                    
+                    foreach($options as $key => $option) {
+                        if ($option['title'] == $value) {
+                            if ($count > 0) {
+                                $meta['value'] .= '|';
+                            }
+                            $meta['value'] .= $key;
+                            break;
+                        }
+                    }
+                    $count++;
+                }
+                
+                $meta['value'] .= ')';
+                
+                $query['meta_query'][$index] = $meta;
+            }
+        }
+    }
+
+    if ($meta_filter_required) {
+        add_filter('get_meta_sql', 'wpcf_views_get_meta_sql', 10, 6);
+    }
+    
+    return $query;
+}
+
+function _wpcf_is_checkboxes_field($field_name) {
+    $opt = get_option('wpcf-fields');
+    if($opt && mb_ereg('^wpcf-', $field_name)) {
+        $field_name = substr($field_name, 5);
+        if (isset($opt[$field_name]['type'])) {
+            $field_type = strtolower($opt[$field_name]['type']);
+            if ( $field_type == 'checkboxes') {
+                return true;
+            }
+        }
+        
+    }
+    
+    return false;
+}
+
+function wpcf_views_get_meta_sql($clause, $queries, $type, $primary_table, $primary_id_column, $context ) {
+    
+    // Look for the REGEXP code we added and covert it to a proper SQL REGEXP 
+    $regex = '/= \'REGEXP\(([^\)]*)\)\'/siU';
+    
+	if(preg_match_all($regex, $clause['where'], $matches, PREG_SET_ORDER)) {
+		foreach($matches as $match) {
+            $clause['where'] = str_replace($match[0], 'REGEXP \'' . $match[1] . '\'', $clause['where']);
+        }
+        
+    }
+    
+    remove_filter('get_meta_sql', 'wpcf_views_get_meta_sql', 10, 6);
+
+    return $clause;
 }

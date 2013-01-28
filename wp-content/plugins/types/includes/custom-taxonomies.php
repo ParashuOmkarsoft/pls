@@ -2,6 +2,7 @@
 /*
  * Custom taxonomies functions.
  */
+require_once WPCF_EMBEDDED_INC_ABSPATH . '/custom-taxonomies.php';
 
 /**
  * Returns HTML formatted AJAX activation link.
@@ -35,4 +36,19 @@ function wpcf_admin_custom_taxonomies_get_ajax_deactivation_link($taxonomy) {
             . '" class="wpcf-ajax-link" id="wpcf-list-activate-'
             . $taxonomy . '">'
             . __('Deactivate', 'wpcf') . '</a>';
+}
+
+/**
+ * Returns only active taxonomies.
+ * 
+ * @return type 
+ */
+function wpcf_get_active_custom_taxonomies() {
+    $taxonomies = get_option('wpcf-custom-taxonomies', array());
+    foreach ($taxonomies as $taxonomy => $data) {
+        if (!empty($data['disabled'])) {
+            unset($taxonomies[$taxonomy]);
+        }
+    }
+    return $taxonomies;
 }
