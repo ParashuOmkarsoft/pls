@@ -106,6 +106,8 @@ function wpv_condition($atts) {
 
     $logging_string = "Original expression: ". $evaluate;
     
+    $evaluate = apply_filters('wpv-extra-condition-filters', $evaluate);
+    
     // evaluate empty() statements for variables
     $empties = preg_match_all("/empty\(\s*\\$(\w+)\s*\)/", $evaluate, $matches);
     
@@ -122,6 +124,25 @@ function wpv_condition($atts) {
 			$evaluate = str_replace($matches[0][$i], $is_empty, $evaluate);
    		 }
     }
+
+    // find variables that are to be used as strings.
+	// eg '$f1'
+	// will replace $f1 with the actual field value
+	$strings_count = preg_match_all('/(\'[\$\w^\']*\')/', $evaluate, $matches);
+	if($strings_count && $strings_count > 0) {
+	    for($i = 0; $i < $strings_count; $i++) {
+	    	$string = $matches[1][$i];
+	    	// remove single quotes from string literals to get value only
+	    	$string = (strpos($string, '\'') === 0) ? substr($string, 1, strlen($string) - 2) : $string;
+	    	if(strpos($string, '$') === 0) {
+	    		$variable_name = substr($string, 1); // omit dollar sign
+	    		if (isset($atts[$variable_name])) {
+					$string = get_post_meta($post->ID, $atts[$variable_name], true);
+					$evaluate = str_replace($matches[1][$i], "'" . $string . "'", $evaluate);
+				}
+	    	}
+		}
+	}
     
     // find string variables and evaluate
 	$strings_count = preg_match_all('/((\$\w+)|(\'[^\']*\'))\s*([\!<>\=]+)\s*((\$\w+)|(\'[^\']*\'))/', $evaluate, $matches);
@@ -135,19 +156,27 @@ function wpv_condition($atts) {
 	    	$second_string = $matches[5][$i];
 	    	$math_sign =  $matches[4][$i];
 	    	
-	    	// replace variables with text representation
-	    	if(strpos($first_string, '$') === 0) {
-	    		$variable_name = substr($first_string, 1); // omit dollar sign
-	    		$first_string = get_post_meta($post->ID, $atts[$variable_name], true);
-	    	}
-	    	if(strpos($second_string, '$') === 0) {
-	    		$variable_name = substr($second_string, 1);
-	    		$second_string = get_post_meta($post->ID, $atts[$variable_name], true);
-	    	}
-	    	
 	    	// remove single quotes from string literals to get value only
 	    	$first_string = (strpos($first_string, '\'') === 0) ? substr($first_string, 1, strlen($first_string) - 2) : $first_string;
 	    	$second_string = (strpos($second_string, '\'') === 0) ? substr($second_string, 1, strlen($second_string) - 2) : $second_string; 
+	    	
+	    	// replace variables with text representation
+	    	if(strpos($first_string, '$') === 0) {
+	    		$variable_name = substr($first_string, 1); // omit dollar sign
+	    		if (isset($atts[$variable_name])) {
+					$first_string = get_post_meta($post->ID, $atts[$variable_name], true);
+				} else {
+					$first_string = '';
+				}
+	    	}
+	    	if(strpos($second_string, '$') === 0) {
+	    		$variable_name = substr($second_string, 1);
+	    		if (isset($atts[$variable_name])) {
+		    		$second_string = get_post_meta($post->ID, $atts[$variable_name], true);
+				} else {
+					$second_string = '';
+				}
+	    	}
 	    	
 	    	// don't do string comparison if variables are numbers 
 	    	if(!(is_numeric($first_string) && is_numeric($second_string))) {
@@ -159,10 +188,28 @@ function wpv_condition($atts) {
 		    	} else {
 		    		$evaluate = str_replace($matches[0][$i], '1=0', $evaluate);
 		    	}
-	    	}
+	    	} else {
+				$evaluate = str_replace($matches[1][$i], $first_string, $evaluate);
+				$evaluate = str_replace($matches[5][$i], $second_string, $evaluate);
+			}
 		}
     }
-    
+
+	// find remaining strings that maybe numeric values.
+	// This handles 1='1'
+	$strings_count = preg_match_all('/(\'[^\']*\')/', $evaluate, $matches);
+	if($strings_count && $strings_count > 0) {
+	    for($i = 0; $i < $strings_count; $i++) {
+	    	$string = $matches[1][$i];
+	    	// remove single quotes from string literals to get value only
+	    	$string = (strpos($string, '\'') === 0) ? substr($string, 1, strlen($string) - 2) : $string;
+			if (is_numeric($string)) {
+				$evaluate = str_replace($matches[1][$i], $string, $evaluate);
+			}
+		}
+	}
+	
+
     // find all variable placeholders in expression
     $count = preg_match_all('/\$(\w+)/', $evaluate, $matches);
     
@@ -174,10 +221,14 @@ function wpv_condition($atts) {
     	$matches[1] = wpv_sort_matches_by_length($matches[1]);
     	
 	    foreach($matches[1] as $match) {
-            $meta = get_post_meta($post->ID, $atts[$match], true);
-            if (empty($meta)) {
-                $meta = "0";
-            }
+			if (isset($atts[$match])) {
+				$meta = get_post_meta($post->ID, $atts[$match], true);
+				if (empty($meta)) {
+					$meta = "0";
+				}
+			} else {
+				$meta = "0";
+			}
 	    	$evaluate = str_replace('$'.$match, $meta, $evaluate);
 	    }
     }
@@ -317,6 +368,7 @@ function wpv_evaluate_expression($expression){
  *
  * id can be a integer to refer directly to a post
  * id can be $parent to refer to the parent
+ * id can be $current_page or refer to the current page
  *
  * id can also refer to a related post type
  * eg. for a stay the related post types could be guest and room
@@ -339,6 +391,16 @@ class WPV_wpcf_switch_post_from_attr_id {
                 // Handle the parent if the id is $parent
                 if ($atts['id'] == '$parent' && isset($post->post_parent)) {
                     $post_id = $post->post_parent;
+				} else if ($atts['id'] == '$current_page') {
+					if (is_single() || is_page()) {
+						global $wp_query;
+						
+						if (isset($wp_query->posts[0])) {
+							$current_post = $wp_query->posts[0];
+							$post_id = $current_post->ID;
+						}
+					}
+					
                 } else {
                     // See if Views has the variable
                     global $WP_Views;
@@ -413,7 +475,7 @@ function WPV_wpcf_record_post_relationship_belongs($content) {
 	global $post, $WPV_wpcf_post_relationship;
     static $related = array();
 	
-    if (function_exists('wpcf_pr_get_belongs')) {
+    if (isset($post) && function_exists('wpcf_pr_get_belongs')) {
         
         if (!isset($related[$post->post_type])) {
             $related[$post->post_type] = wpcf_pr_get_belongs($post->post_type);
@@ -430,4 +492,126 @@ function WPV_wpcf_record_post_relationship_belongs($content) {
     
 
 	return $content;
+}
+
+/**
+ * Form for Enlimbo calls for wpv-control shortcode calls
+ 
+ * @param unknown_type $elements
+ */
+function wpv_form_control($elements) {
+    static $form = NULL;
+    require_once 'classes/control_forms.php';
+    if (is_null($form)) {
+        $form = new Enlimbo_Control_Forms();
+    }
+    return $form->renderElements($elements);
+}
+
+/**
+ * Dismiss message.
+ * 
+ * @param type $message_id
+ * @param string $message
+ * @param type $class 
+ */
+function wpv_add_dismiss_message($message_id, $message, $clear_dismissed = false, $class = 'updated') {
+    $dismissed_messages = get_option('wpv-dismissed-messages', array());
+	if ($clear_dismissed) {
+		if (isset($dismissed_messages[$message_id])) {
+			unset($dismissed_messages[$message_id]);
+	        update_option('wpv-dismissed-messages', $dismissed_messages);
+		}
+	}
+    if (!array_key_exists($message_id, $dismissed_messages)) {
+        $message = $message . '<div style="float:right; margin:-15px 0 0 15px;"><a onclick="jQuery(this).parent().parent().fadeOut();jQuery.get(\''
+                . admin_url('admin-ajax.php?action=wpv_dismiss_message&amp;message_id='
+                        . $message_id . '&amp;_wpnonce='
+                        . wp_create_nonce('dismiss_message')) . '\');return false;"'
+                . 'class="button-secondary" href="javascript:void(0);">'
+                . __("Don't show this message again", 'wpv-views') . '</a></div>';
+        wpv_admin_message_store($message_id, $message, false);
+    }
+}
+
+add_action('wp_ajax_wpv_dismiss_message', 'wpv_dismiss_message_ajax');
+
+/**
+ * Dismiss message AJAX. 
+ */
+function wpv_dismiss_message_ajax() {
+    if (isset($_GET['message_id']) && isset($_GET['_wpnonce'])
+            && wp_verify_nonce($_GET['_wpnonce'], 'dismiss_message')) {
+        $dismissed_messages = get_option('wpv-dismissed-messages', array());
+        $dismissed_messages[strval($_GET['message_id'])] = 1;
+        update_option('wpv-dismissed-messages', $dismissed_messages);
+    }
+    die('ajax');
+}
+
+// disable the admin messages for now. They are causing problems.
+//add_action('admin_head', 'wpv_show_admin_messages');
+
+/**
+ * Shows stored admin messages. 
+ */
+function wpv_show_admin_messages() {
+    $messages = get_option('wpv-messages', array());
+    $dismissed_messages = get_option('wpv-dismissed-messages', array());
+    foreach ($messages as $message_id => $message) {
+        if (array_key_exists($message_id, $dismissed_messages)) {
+            unset($messages[$message_id]);
+            continue;
+        }
+		// update the nonce
+		$text = $message['message'];
+	    $nonce = preg_match_all("/_wpnonce=[^']+/", $text, $matches);
+		
+		if ($nonce) {
+			$text = str_replace($matches[0][0], '_wpnonce=' . wp_create_nonce('dismiss_message'), $text);
+		}
+		
+        wpv_admin_message($message_id, $text, $message['class']);
+        if ($show_once) {
+            unset($messages[$message_id]);
+        }
+    }
+    update_option('wpv-messages', $messages);
+}
+
+/**
+ * Stores admin messages.
+ * 
+ * @param type $message_id
+ * @param type $message
+ * @param type $show_once
+ * @param type $class 
+ */
+function wpv_admin_message_store($message_id, $message, $show_once = true,
+        $class = 'updated') {
+    $messages = get_option('wpv-messages', array());
+    $messages[strval($message_id)] = array(
+        'message' => strval($message),
+        'class' => strval($class),
+        'show_once' => $show_once,
+    );
+    update_option('wpv-messages', $messages);
+}
+
+/**
+ * Shows admin message.
+ * 
+ * @param type $message_id
+ * @param type $message
+ * @param type $class 
+ */
+function wpv_admin_message($message_id, $message, $class = 'updated') {
+    if (apply_filters('wpv-show-message', true, $message_id)) {
+		add_action('admin_notices',
+                create_function('$a=1, $message_id=\'' . strval($message_id)
+                        . '\', $class=\'' . strval($class)
+                        . '\', $message=\''
+                        . htmlentities(strval($message), ENT_QUOTES) . '\'',
+                        '$screen = get_current_screen(); if (!$screen->is_network) echo "<div class=\"message $class\" id=\"wpv-message-$message_id\"><p>" . html_entity_decode($message, ENT_QUOTES) . "</p></div>";'));
+	}
 }

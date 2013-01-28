@@ -306,7 +306,6 @@ div.slp_bulk_upload_div {
   background-color: #F8F7DE;
   border: 1px solid #F6E39A;
   margin: 6px;
-  padding: 0 6px 6px;
 }
  div.add_location_form {
      display:block;
@@ -479,7 +478,7 @@ div.section_column .form_entry {
     text-align:left;
 }
 
-.section_description .input_note {
+div.input_note {
 	clear: both;
 	text-align: left;
 	margin: 0px 0px 6px 190px;
@@ -499,10 +498,9 @@ div.section_column .form_entry {
 }
 
 div.slp_icon_row {
-    margin: 6px 3px 24px 150px;
+    margin: 0px;
     overflow: auto;
-    width: 360px;
-    height: 110px;
+    height: 140px;
 }
 
 div.slp_icon_selector_box {

@@ -7,6 +7,7 @@ jQuery(document).ready(function(){
     jQuery('.wpcf-fields-add-ajax-link').click(function(){
         jQuery.ajax({
             url: jQuery(this).attr('href'),
+            cache: false,
             beforeSend: function() {
                 jQuery('#wpcf-fields-under-title').hide();
                 jQuery('#wpcf-ajax-response').addClass('wpcf-ajax-loading');
@@ -61,19 +62,21 @@ jQuery(document).ready(function(){
             if (jQuery(this).parents('form').hasClass('wpcf-fields-form')) {
                 // Get group id
                 var group_id = false;
-                if (jQuery('input:[name="group_id"]').length > 0) {
-                    group_id = jQuery('input:[name="group_id"]').val();
+                if (jQuery('input[name="group_id"]').length > 0) {
+                    group_id = jQuery('input[name="group_id"]').val();
                 } else {
                     group_id = -1;
                 }
                 jQuery.ajax({
                     url: ajaxurl,
+                    cache: false,
                     type: 'get',
                     data: 'action=wpcf_ajax&wpcf_action=group_form_collapsed&id='+collapsed+'&toggle='+toggle+'&group_id='+group_id+'&_wpnonce='+wpcf_nonce_toggle_group
                 });
             } else {
                 jQuery.ajax({
                     url: ajaxurl,
+                    cache: false,
                     type: 'get',
                     data: 'action=wpcf_ajax&wpcf_action=form_fieldset_toggle&id='+collapsed+'&toggle='+toggle+'&_wpnonce'+wpcf_nonce_toggle_fieldset
                 });
@@ -125,6 +128,57 @@ jQuery(document).ready(function(){
             // Bind message fade out
             jQuery('.wpcf-compare-unique-value').live('keyup', function(){
                 jQuery(this).parents('.wpcf-compare-unique-value-wrapper').find('.wpcf-form-error-unique-value').fadeOut(function(){
+                    jQuery(this).remove();
+                });
+            });
+            return false;
+        }
+        // Check field names unique
+        passed = true;
+        checkedArr = new Array();
+        jQuery('.wpcf-forms-field-name').each(function(index){
+            var currentValue = jQuery(this).val().toLowerCase();
+            if (jQuery.inArray(currentValue, checkedArr) > -1) {
+                passed = false;
+                if (!jQuery(this).hasClass('wpcf-name-checked-error')) {
+                    jQuery(this).before('<div class="wpcf-form-error-unique-value wpcf-form-error">'+wpcfFormUniqueNamesCheckText+'</div>').addClass('wpcf-name-checked-error');
+                }
+                jQuery(this).parents('fieldset').children('.fieldset-wrapper').slideDown();
+                jQuery(this).focus();
+                    
+            }
+            checkedArr.push(currentValue);
+        });
+        if (passed == false) {
+            // Bind message fade out
+            jQuery('.wpcf-forms-field-name').live('keyup', function(){
+                jQuery(this).removeClass('wpcf-name-checked-error').prev('.wpcf-form-error-unique-value').fadeOut(function(){
+                    jQuery(this).remove();
+                });
+            });
+            return false;
+        }
+        
+        // Check field slugs unique
+        passed = true;
+        checkedArr = new Array();
+        jQuery('.wpcf-forms-field-slug').each(function(index){
+            var currentValue = jQuery(this).val().toLowerCase();
+            if (jQuery.inArray(currentValue, checkedArr) > -1) {
+                passed = false;
+                if (!jQuery(this).hasClass('wpcf-slug-checked-error')) {
+                    jQuery(this).before('<div class="wpcf-form-error-unique-value wpcf-form-error">'+wpcfFormUniqueSlugsCheckText+'</div>').addClass('wpcf-slug-checked-error');
+                }
+                jQuery(this).parents('fieldset').children('.fieldset-wrapper').slideDown();
+                jQuery(this).focus();
+                    
+            }
+            checkedArr.push(currentValue);
+        });
+        if (passed == false) {
+            // Bind message fade out
+            jQuery('.wpcf-forms-field-slug').live('keyup', function(){
+                jQuery(this).removeClass('wpcf-slug-checked-error').prev('.wpcf-form-error-unique-value').fadeOut(function(){
                     jQuery(this).remove();
                 });
             });
@@ -218,35 +272,35 @@ jQuery(document).ready(function(){
     }
     
     // Types form
-    jQuery('input:[name="ct[public]"]').change(function(){
+    jQuery('input[name="ct[public]"]').change(function(){
         if (jQuery(this).val() == 'public') {
             jQuery('#wpcf-types-form-visiblity-toggle').slideDown();
         } else {
             jQuery('#wpcf-types-form-visiblity-toggle').slideUp();
         }
     });
-    jQuery('input:[name="ct[rewrite][custom]"]').change(function(){
+    jQuery('input[name="ct[rewrite][custom]"]').change(function(){
         if (jQuery(this).val() == 'custom') {
             jQuery('#wpcf-types-form-rewrite-toggle').slideDown();
         } else {
             jQuery('#wpcf-types-form-rewrite-toggle').slideUp();
         }
     });
-    jQuery('.wpcf-tax-form input:[name="ct[rewrite][enabled]"]').change(function(){
+    jQuery('.wpcf-tax-form input[name="ct[rewrite][enabled]"]').change(function(){
         if (jQuery(this).is(':checked')) {
             jQuery('#wpcf-types-form-rewrite-toggle').slideDown();
         } else {
             jQuery('#wpcf-types-form-rewrite-toggle').slideUp();
         }
     });
-    jQuery('input:[name="ct[show_in_menu]"]').change(function(){
+    jQuery('input[name="ct[show_in_menu]"]').change(function(){
         if (jQuery(this).is(':checked')) {
             jQuery('#wpcf-types-form-showinmenu-toggle').slideDown();
         } else {
             jQuery('#wpcf-types-form-showinmenu-toggle').slideUp();
         }
     });
-    jQuery('input:[name="ct[query_var_enabled]"]').change(function(){
+    jQuery('input[name="ct[query_var_enabled]"]').change(function(){
         if (jQuery(this).is(':checked')) {
             jQuery('#wpcf-types-form-queryvar-toggle').slideDown();
         } else {
@@ -342,4 +396,59 @@ function wpcfFieldsFormFiltersSummary() {
     string = string.replace('%tx%', tx.join(', '));
     string = string.replace('%vt%', vt.join(', '));
     jQuery('#wpcf-fields-form-filters-association-summary').html(string);
+}
+
+// Migrate checkboxes
+function wpcfCbSaveEmptyMigrate(object, field_slug, total, wpnonce, action) {
+    jQuery.ajax({
+        url: ajaxurl+'?action=wpcf_ajax&wpcf_action=cb_save_empty_migrate&field='+field_slug+'&subaction='+action+'&total='+total+'&_wpnonce='+wpnonce,
+        type: 'get',
+        dataType: 'json',
+        //            data: ,
+        cache: false,
+        beforeSend: function() {
+            object.parent().parent().find('.wpcf-cb-save-empty-migrate-response').html('').show().addClass('wpcf-ajax-loading-small');
+        },
+        success: function(data) {
+            if (data != null) {
+                if (typeof data.output != 'undefined') {
+                    object.parent().parent().find('.wpcf-cb-save-empty-migrate-response').removeClass('wpcf-ajax-loading-small').html(data.output);
+                }
+            }
+        }
+    });
+}
+
+function wpcfCbMigrateStep(total, offset, field_slug, wpnonce) {
+    jQuery.ajax({
+        url: ajaxurl+'?action=wpcf_ajax&wpcf_action=cb_save_empty_migrate&field='+field_slug+'&subaction=save&total='+total+'&offset='+offset+'&_wpnonce='+wpnonce,
+        type: 'get',
+        dataType: 'json',
+        //            data: ,
+        cache: false,
+        beforeSend: function() {
+        //            jQuery('#wpcf-cb-save-empty-migrate-response-'+field_slug).html(total+'/'+offset);
+        },
+        success: function(data) {
+            if (data != null) {
+                if (typeof data.output != 'undefined') {
+                    jQuery('#wpcf-cb-save-empty-migrate-response-'+field_slug).html(data.output);
+                }
+            }
+        }
+    });
+}
+
+function wpcfCdCheckDateCustomized(object) {
+    var show = false;
+    object.parents('.fieldset-wrapper').find('.wpcf-cd-field option:selected').each(function(){
+        if (jQuery(this).hasClass('wpcf-conditional-select-date')) {
+            show = true;
+        }
+    });
+    if (show) {
+        object.parent().find('.wpcf-cd-notice-date').show();
+    } else {
+        object.parent().find('.wpcf-cd-notice-date').show();
+    }
 }

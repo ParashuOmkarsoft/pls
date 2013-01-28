@@ -127,6 +127,144 @@ function wpcf_form($id, $form = array()) {
 }
 
 /**
+ * Add submit button, cancel button and help link to the popup.
+ *
+ */
+
+function wpcf_form_popup_helper($form, $submit_text = '', $cancel_text = '', $help = array()) {
+    if ($submit_text) {
+        $form['submit'] = array(
+            '#type' => 'submit',
+            '#name' => 'submit',
+            '#value' => $submit_text,
+            '#attributes' => array('class' => 'button-primary'),
+        );
+    }
+    if ($cancel_text) {
+        $form['cancel'] = array(
+            '#type' => 'button',
+            '#name' => 'cancel',
+            '#value' => $cancel_text,
+            '#attributes' => array('class' => 'button-secondary',
+                                   'onclick' => 'window.parent.jQuery(\'#TB_closeWindowButton\').click();return true;'),
+            '#before' => ' ',
+        );
+    }
+    if ($help) {
+        $form = array_reverse($form, true);
+        $form['help'] = array(
+            '#type' => 'markup',
+            '#markup' => '<p style="float:right;"><a class="wpcf-help-link" href="' . $help['url'] . '" target="_blank">' . $help['text'] . '</a></p>',
+        );
+        $form = array_reverse($form, true);
+    }
+    
+    return $form;
+}
+
+/**
+ * Add optional items to the popup.
+ *
+ */
+
+function wpcf_form_popup_add_optional($form) {
+    
+    $onclick = 'if (jQuery(\'#wpcf-popup-optionals\').is(\':visible\')) {
+                        jQuery(this).html(\'' . __('Advanced', 'wpcf') . ' &raquo;\');
+                        jQuery(\'#wpcf-popup-optionals\').hide();
+                    } else {
+                        jQuery(this).html(\'&laquo; ' . __('Hide advanced', 'wpcf') . '\');
+                        jQuery(\'#wpcf-popup-optionals\').show();
+                    }
+                        ';
+
+    $form['optional-start'] = array(
+        '#type' => 'markup',
+        '#markup' => '<a href="#" onclick="' . $onclick . '">' . __('Advanced', 'wpcf') . ' &raquo;</a><br /><div id="wpcf-popup-optionals" style="margin-left:20px;display:none">',
+        );
+
+    $form['show_name'] = array(
+        '#type' => 'checkbox',
+        '#title' => __('Show the field name before the value', 'wpcf'),
+        '#name' => 'show_name',
+        '#inline' => true,
+        '#after' => '<br />',
+        '#before' => '<br />',
+        );
+    
+    $form['raw_mode'] = array(
+        '#type' => 'checkbox',
+        '#title' => __('Raw mode - Outputs exactly what is saved in the database', 'wpcf'),
+        '#default_value' => '',
+        '#name' => 'raw_mode',
+        '#inline' => true,
+        '#after' => '<br />',
+        );
+    
+    $form['html_mode'] = array(
+        '#type' => 'checkbox',
+        '#title' => __('Wrap output in a div', 'wpcf'),
+        '#default_value' => '',
+        '#name' => 'html_mode',
+        '#inline' => true,
+        '#after' => '<br />',
+        );
+    
+    $form['css'] = array(
+        '#type' => 'textfield',
+        '#title' => '<td style="text-align:right;">' . __('CSS class:', 'wpcf') . '</td><td>',
+        '#name' => 'css',
+        '#value' => '',
+        '#before' => '<br /><table><tr>',
+        '#after' => '</td></tr>',
+    );
+    $form['style'] = array(
+        '#type' => 'textfield',
+        '#title' => '<td style="text-align:right;">' . __('CSS style:', 'wpcf') . '</td><td>',
+        '#name' => 'style',
+        '#value' => '',
+        '#before' => '<tr>',
+        '#after' => '</tr></table>'
+    );
+    $form['optional-end'] = array(
+        '#type' => 'markup',
+        '#markup' => '</div>',
+    );
+
+
+    return $form;    
+}
+
+/**
+ * Add the optional values from the popup to the shortcode.
+ *
+ */
+
+function wpcf_fields_add_optionals_to_shortcode($shortcode) {
+
+    if (isset($_POST['css']) && $_POST['css'] != '') {
+        $shortcode = preg_replace('/\[types([^\]]*)/', '$0 class="' . $_POST['css'] . '"', $shortcode);
+    }
+    if (isset($_POST['style']) && $_POST['style'] != '') {
+        $shortcode = preg_replace('/\[types([^\]]*)/', '$0 style="' . $_POST['style'] . '"', $shortcode);
+    }
+
+    if (isset($_POST['show_name']) && $_POST['show_name'] == '1') {
+        $shortcode = preg_replace('/\[types([^\]]*)/', '$0 show_name="true"', $shortcode);
+    }
+    
+
+    if (isset($_POST['raw_mode']) && $_POST['raw_mode'] == '1') {
+        $shortcode = preg_replace('/\[types([^\]]*)/', '$0 raw="true"', $shortcode);
+    }
+    
+    if (isset($_POST['html_mode']) && $_POST['html_mode'] == '1') {
+        $shortcode = preg_replace('/\[types([^\]]*)/', '$0 output="html"', $shortcode);
+    }
+    
+    return $shortcode;
+}
+/**
  * Renders form elements.
  * 
  * @staticvar string $form
@@ -218,7 +356,7 @@ function wpcf_form_render_js_validation($form = '.wpcf-form-validate',
             continue;
         }
         if (in_array($element['#type'], array('radios'))) {
-            $output .= 'jQuery(\'input:[name="' . $element['#name'] . '"]\').rules("add", {' . "\r\n";
+            $output .= 'jQuery(\'input[name="' . $element['#name'] . '"]\').rules("add", {' . "\r\n";
         } else {
             $output .= 'jQuery("#' . $id . '").rules("add", {' . "\r\n";
         }
@@ -321,11 +459,17 @@ function wpcf_admin_message($message, $class = 'updated') {
 function wpcf_show_admin_messages() {
     $messages = get_option('wpcf-messages', array());
     $messages_for_user = isset($messages[get_current_user_id()]) ? $messages[get_current_user_id()] : array();
+    $dismissed = get_option('wpcf_dismissed_messages', array());
     if (!empty($messages_for_user)) {
-        foreach ($messages_for_user as $message) {
-            wpcf_admin_message($message['message'], $message['class']);
+        foreach ($messages_for_user as $message_id => $message) {
+            if (!in_array($message['keep_id'], $dismissed)) {
+                wpcf_admin_message($message['message'], $message['class']);
+            }
+            if (empty($message['keep_id'])
+                    || in_array($message['keep_id'], $dismissed)) {
+                unset($messages[get_current_user_id()][$message_id]);
+            }
         }
-        unset($messages[get_current_user_id()]);
     }
     update_option('wpcf-messages', $messages);
 }
@@ -337,13 +481,66 @@ function wpcf_show_admin_messages() {
  * @param type $class
  * @return type 
  */
-function wpcf_admin_message_store($message, $class = 'updated') {
+function wpcf_admin_message_store($message, $class = 'updated', $keep_id = false) {
     $messages = get_option('wpcf-messages', array());
     $messages[get_current_user_id()][md5($message)] = array(
         'message' => $message,
-        'class' => $class
+        'class' => $class,
+        'keep_id' => $keep_id ? $keep_id : false,
     );
     update_option('wpcf-messages', $messages);
+}
+
+/**
+ * Admin notice with dismiss button.
+ * 
+ * @param type $ID
+ * @param string $message
+ * @param type $store
+ * @return boolean 
+ */
+function wpcf_admin_message_dismiss($ID, $message, $store = true) {
+    $dismissed = get_option('wpcf_dismissed_messages', array());
+    if (in_array($ID, $dismissed)) {
+        return false;
+    }
+    $message = $message . '<div style="float:right; margin:-15px 0 0 15px;"><a onclick="jQuery(this).parent().parent().fadeOut();jQuery.get(\''
+            . admin_url('admin-ajax.php?action=wpcf_ajax&amp;wpcf_action=dismiss_message&amp;id='
+                    . $ID . '&amp;_wpnonce=' . wp_create_nonce('dismiss_message')) . '\');return false;"'
+            . 'class="button-secondary" href="javascript:void(0);">'
+            . __('Dismiss', 'wpcf') . '</a></div>';
+    if ($store) {
+        wpcf_admin_message_store($message, 'updated', $ID);
+    } else {
+        wpcf_admin_message($message);
+    }
+}
+
+/**
+ * Adds dismissed message to record.
+ * 
+ * @param type $ID 
+ */
+function wpcf_admin_message_set_dismissed($ID) {
+    $messages = get_option('wpcf_dismissed_messages', array());
+    if (!in_array($ID, $messages)) {
+        $messages[] = $ID;
+        update_option('wpcf_dismissed_messages', $messages);
+    }
+}
+
+/**
+ * Removes dismissed message from record.
+ * 
+ * @param type $ID 
+ */
+function wpcf_admin_message_restore_dismissed($ID) {
+    $messages = get_option('wpcf_dismissed_messages', array());
+    $key = array_search($ID, $messages);
+    if ($key !== false) {
+        unset($messages[$key]);
+        update_option('wpcf_dismissed_messages', $messages);
+    }
 }
 
 /**
@@ -458,12 +655,11 @@ function wpcf_admin_ajax_head($title) {
             wp_admin_css();
             wp_admin_css('colors');
             wp_admin_css('ie');
-            do_action('admin_enqueue_scripts', $hook_suffix);
+//            do_action('admin_enqueue_scripts', $hook_suffix);
             do_action("admin_print_styles-$hook_suffix");
             do_action('admin_print_styles');
-            do_action("admin_print_scripts-$hook_suffix");
+//            do_action("admin_print_scripts-$hook_suffix");
             do_action('admin_print_scripts');
-            // TODO Check if needed
 //            do_action("admin_head-$hook_suffix");
 //            do_action('admin_head');
             do_action('admin_head_wpcf_ajax');
@@ -472,6 +668,21 @@ function wpcf_admin_ajax_head($title) {
             <style type="text/css">
                 html { height: auto; }
             </style>
+        
+            <script type="text/javascript">
+                // <![CDATA[
+                jQuery(document).ready(function(){
+                    // Position the help link in the title bar.
+                    var title = jQuery('#TB_closeAjaxWindow', window.parent.document);
+                    if (title.length != 0) {
+                        title.after(jQuery('.wpcf-help-link'));
+                    }
+                });
+                // ]]>
+            </script>
+        
+            <link rel="stylesheet" href="<?php echo WPCF_EMBEDDED_RES_RELPATH . '/css/basic.css'; ?>" type="text/css" media="all" />
+            
         </head>
         <body style="padding: 20px;">
             <?php
@@ -524,7 +735,7 @@ function wpcf_admin_get_var_from_referer($var) {
 function wpcf_admin_add_js_settings($id, $setting = '') {
     static $settings = array();
     $settings['wpcf_nonce_ajax_callback'] = '\'' . wp_create_nonce('execute') . '\'';
-    $settings['wpcf_cookiedomain'] = '\'' . $_SERVER['SERVER_NAME'] . '\'';
+    $settings['wpcf_cookiedomain'] = '\'' . COOKIE_DOMAIN . '\'';
     $settings['wpcf_cookiepath'] = '\'' . COOKIEPATH . '\'';
     if ($id == 'get') {
         $temp = $settings;

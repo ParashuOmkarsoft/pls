@@ -55,30 +55,43 @@ $expr = "/,(?=(?:[^\"]*\"[^\"]*\")*(?![^\"]*\"))/";
 $parts = preg_split($expr, trim(html_entity_decode($query, ENT_QUOTES | ENT_HTML5)));
 $parts = preg_replace("/^\"(.*)\"$/","$1",$parts);
 
+// Return the address in CSV format from the reports
+//
 if ($parts[0] == 'addr') {
     $slpReportStartDate = $parts[1];
     $slpReportEndDate = $parts[2];
-    $slpReportLimit = $parts[3];
+
+    // Only Digits Here Please
+    //
+    $slpReportLimit = preg_replace('/[^0-9]/', '', $parts[3]);
+
     
-$query = sprintf(
+    $query =
     "SELECT slp_repq_address, count(*)  as QueryCount FROM %s " .
         "WHERE slp_repq_time > '%s' AND " .
         "      slp_repq_time <= '%s' " .
         "GROUP BY slp_repq_address ".
         "ORDER BY QueryCount DESC " .
         "LIMIT %s"
-        ,
-    $slpQueryTable,
-    $slpReportStartDate,
-    $slpReportEndDate,
-    $slpReportLimit
-    );
+        ;
+    $queryParms = array(
+        $slpQueryTable,
+        $slpReportStartDate,
+        $slpReportEndDate,
+        $slpReportLimit
+        );
+
+// Return the locations searches in CSV format from the reports
+//
 } else if ($parts[0] == 'top') {
     $slpReportStartDate = $parts[1];
     $slpReportEndDate = $parts[2];
-    $slpReportLimit = $parts[3];
+    
+    // Only Digits Here Please
+    //
+    $slpReportLimit = preg_replace('/[^0-9]/', '', $parts[3]);
 
-    $query = sprintf(
+    $query = 
     "SELECT sl_store,sl_city,sl_state, sl_zip, sl_tags, count(*) as ResultCount " . 
         "FROM %s res ".
             "LEFT JOIN %s sl ". 
@@ -89,20 +102,32 @@ $query = sprintf(
         "GROUP BY sl_store,sl_city,sl_state,sl_zip,sl_tags ".
         "ORDER BY ResultCount DESC ".
         "LIMIT %s"
-        ,
-    $slpResultsTable,
-    $slpLocationsTable,
-    $slpQueryTable,
-    $slpReportStartDate,
-    $slpReportEndDate,
-    $slpReportLimit
-    );
+        ;
+    $queryParms = array(
+        $slpResultsTable,
+        $slpLocationsTable,
+        $slpQueryTable,
+        $slpReportStartDate,
+        $slpReportEndDate,
+        $slpReportLimit
+        );
+
+// Not Locations (top) or addresses entered in search
+// short circuit...
+//
+} else {
+    die(__("Cheatin' huh?",'csl-slplus'));
 }
-$query = stripslashes(htmlspecialchars_decode($query,ENT_QUOTES));
-$query = $wpdb->prepare($query);
-//echo $query;
+
+// No parms array?  GTFO
+//
+if (is_array($queryParms)) {
+    die(__("Cheatin' huh?",'csl-slplus'));
+}
+
 // Run the query & output the data in a CSV
-$thisDataset = $wpdb->get_results($query,ARRAY_N);
+$preppedSQL = $wpdb->prepare(stripslashes(htmlspecialchars_decode($query,ENT_QUOTES)),$queryParms);
+$thisDataset = $wpdb->get_results($preppedSQL,ARRAY_N);
 
 
 // Sorting

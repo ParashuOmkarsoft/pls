@@ -14,8 +14,6 @@
  * 'raw' => 'true'|'false' (display raw data stored in DB, default false)
  * 'output' => 'html' (wrap data in HTML, optional)
  * 'show_name' => 'true' (show field name before value e.g. My checkbox: $value)
- * 'checked_html' => base64_encode('<img src="image-on.png" />')
- * 'unchecked_html' => base64_encode('<img src="image-off.png" />')
  *
  * Example usage:
  * With a short code use [types field="my-checkboxes"]
@@ -29,7 +27,7 @@
  * @return type 
  */
 function wpcf_fields_checkboxes_insert_form($form_data, $parent_name = '') {
-    $id = 'wpcf-fields-checkboxes-' . mt_rand();
+    $id = 'wpcf-fields-checkboxes-' . wpcf_unique_id(serialize($form_data). $parent_name);
     $form = array();
     $form['name'] = array(
         '#type' => 'textfield',
@@ -47,6 +45,29 @@ function wpcf_fields_checkboxes_insert_form($form_data, $parent_name = '') {
         '#name' => 'description',
         '#attributes' => array('rows' => 5, 'cols' => 1),
     );
+     $cb_migrate_save = !empty($form_data['slug']) ? 'wpcfCbSaveEmptyMigrate(jQuery(this), \'' . $form_data['slug'] . '\', \'\', \'' . wp_create_nonce('cb_save_empty_migrate') . '\', \'save_check\');' : '';
+    $cb_migrate_do_not_save = !empty($form_data['slug']) ? 'wpcfCbSaveEmptyMigrate(jQuery(this), \'' . $form_data['slug'] . '\', \'\', \'' . wp_create_nonce('cb_save_empty_migrate') . '\', \'do_not_save_check\');' : '';
+    $update_response = !empty($form_data['slug']) ? '<div id="wpcf-cb-save-empty-migrate-response-'
+            . $form_data['slug'] . '" class="wpcf-cb-save-empty-migrate-response"></div>' : '<div class="wpcf-cb-save-empty-migrate-response"></div>';
+    $form['save_empty'] = array(
+        '#type' => 'radios',
+        '#name' => 'save_empty',
+        '#default_value' => !empty($form_data['data']['save_empty']) ? $form_data['data']['save_empty'] : 'no',
+        '#options' => array(
+            'yes' => array(
+                '#title' => __('When unchecked, save 0 to the database', 'wpcf'),
+                '#value' => 'yes',
+                '#attributes' => array('class' => 'wpcf-cb-save-empty-migrate', 'onclick' => $cb_migrate_save),
+            ),
+            'no' => array(
+                '#title' => __("When unchecked, don't save anything to the database",
+                        'wpcf'),
+                '#value' => 'no',
+                '#attributes' => array('class' => 'wpcf-cb-save-empty-migrate', 'onclick' => $cb_migrate_do_not_save),
+            ),
+        ),
+        '#after' => $update_response,
+    );
     $form['options-markup-open'] = array(
         '#type' => 'markup',
         '#markup' => '<strong>' . __('Checkboxes', 'wpcf')
@@ -63,7 +84,8 @@ function wpcf_fields_checkboxes_insert_form($form_data, $parent_name = '') {
             }
             $option['key'] = $option_key;
             $option['default'] = isset($options['default']) ? $options['default'] : null;
-            $form_option = wpcf_fields_checkboxes_get_option($parent_name, $option);
+            $form_option = wpcf_fields_checkboxes_get_option($parent_name,
+                    $option);
             $existing_options[array_shift($form_option)] = $option;
             $form = $form + $form_option;
         }
@@ -110,7 +132,7 @@ function wpcf_fields_checkboxes_insert_form($form_data, $parent_name = '') {
  */
 function wpcf_fields_checkboxes_get_option($parent_name = '',
         $form_data = array()) {
-    $id = isset($form_data['key']) ? $form_data['key'] : 'wpcf-fields-checkboxes-option-' . mt_rand();
+    $id = isset($form_data['key']) ? $form_data['key'] : 'wpcf-fields-checkboxes-option-' . wpcf_unique_id(serialize($form_data) . $parent_name);
     $form = array();
     $count = isset($_GET['count']) ? $_GET['count'] : 1;
     $title = isset($_GET['count']) ? __('Checkbox title', 'wpcf') . ' ' . $_GET['count'] : __('Checkbox title',
@@ -155,7 +177,7 @@ function wpcf_fields_checkboxes_get_option($parent_name = '',
         '#value' => isset($form_data['set_value']) ? $form_data['set_value'] : 1,
     );
     $form[$id]['checked'] = array(
-        '#id' => 'checkboxes-' . mt_rand(),
+        '#id' => 'checkboxes-' . wpcf_unique_id(serialize($form_data) . $parent_name),
         '#type' => 'checkbox',
         '#title' => __('Set checked by default (on new post)?', 'wpcf'),
         '#name' => $parent_name . '[options][' . $id . '][checked]',

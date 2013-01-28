@@ -39,6 +39,7 @@ if (! class_exists('SLPlus_Actions')) {
             if (!isset($this->parent) || ($this->parent == null)) {
                 global $slplus_plugin;
                 $this->parent = $slplus_plugin;
+                $this->plugin = $slplus_plugin;
             }
             return (isset($this->parent) && ($this->parent != null));
         }
@@ -98,11 +99,9 @@ if (! class_exists('SLPlus_Actions')) {
          *
          */
         function admin_menu() {
-            if (
-                (!function_exists('add_slplus_roles_and_caps') || current_user_can('manage_slp'))
-                )
-            {
-                if (!$this->setParent()) { return; }
+            if (!$this->setParent()) { return; }
+
+            if (current_user_can('manage_slp')) {
                 $this->attachAdminUI();
                 
                 // The main hook for the menu
@@ -110,7 +109,7 @@ if (! class_exists('SLPlus_Actions')) {
                 add_menu_page(
                     $this->parent->name,
                     $this->parent->name,
-                    'administrator',
+                    'manage_slp',
                     $this->parent->prefix,
                     array('SLPlus_AdminUI','renderPage_GeneralSettings'),
                     SLPLUS_COREURL . 'images/icon_from_jpg_16x16.png'
@@ -177,7 +176,7 @@ if (! class_exists('SLPlus_Actions')) {
                             $this->parent->prefix,
                             $menuItem['label'],
                             $menuItem['label'],
-                            'administrator',
+                            'manage_slp',
                             $menuItem['slug'],
                             array($menuItem['class'],$menuItem['function'])
                             );
@@ -189,7 +188,7 @@ if (! class_exists('SLPlus_Actions')) {
                             $this->parent->prefix,
                             $menuItem['label'],
                             $menuItem['label'],
-                            'administrator',
+                            'manage_slp',
                             $menuItem['url']
                             );
                     }
@@ -260,6 +259,7 @@ if (! class_exists('SLPlus_Actions')) {
                     'description'       => __('Store Locator Plus location pages.',SLPLUS_PREFIX),
                     'menu_postion'      => 20,   
                     'menu_icon'         => SLPLUS_COREURL . 'images/icon_from_jpg_16x16.png',
+                    'show_in_menu'      => current_user_can('manage_slp'),
                     'capability_type'   => 'page',
                     'supports'          =>
                         array(
@@ -343,7 +343,6 @@ if (! class_exists('SLPlus_Actions')) {
                     );
 
             $sl_google_map_domain=get_option('sl_google_map_domain','maps.google.com');
-            $sl_map_character_encoding='&oe='.get_option('sl_map_character_encoding','utf8');    
 
             //------------------------
             // Register our scripts for later enqueue when needed
@@ -353,6 +352,7 @@ if (! class_exists('SLPlus_Actions')) {
                 if (isset($api_key))
                 {
                      //todo:character encoding ???
+                     // $sl_map_character_encoding='&oe='.get_option('sl_map_character_encoding','utf8');
                     //"http://$sl_google_map_domain/maps?file=api&amp;v=2&amp;key=$api_key&amp;sensor=false{$sl_map_character_encoding}"
                     wp_enqueue_script(
                             'google_maps',

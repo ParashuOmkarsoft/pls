@@ -1,9 +1,7 @@
 <?php
-  global $sl_search_label,
-      $sl_radius_label, $r_options,
-      $cs_options, $slplus_state_options, $sl_country_options,
-      $slplus_plugin;
-      $slp_SearchDivs = new SLPlus_UI_DivManager();
+global $sl_search_label, $sl_radius_label, $cs_options, $slplus_state_options, $sl_country_options, $slplus_plugin;
+
+$slp_SearchDivs = new SLPlus_UI_DivManager();
 ?>
 <form onsubmit='cslmap.searchLocations(); return false;' id='searchForm' action=''>
     <table  id='search_table' border='0' cellpadding='3px' class='sl_header'>
@@ -136,7 +134,7 @@ ob_start();
                         get_option('sl_name_label',__('Name of Store','csl-slplus')),
                         '',
                         (get_option(SLPLUS_PREFIX.'_show_search_by_name',0) == 0),
-                        'nameSearch'
+                        'div_nameSearch'
                         );
                 add_filter('slp_search_form_divs',array($slp_SearchDivs,'buildDiv50'),50);
             }
@@ -160,16 +158,16 @@ ob_start();
           // We are not hiding the radius selection
           //
         ob_start();
-        if (get_option(SLPLUS_PREFIX.'_hide_radius_selections') == 0) {
+        if (get_option(SLPLUS_PREFIX.'_hide_radius_selections',0) == 0) {
         ?>
             <div id='addy_in_radius'>
                 <label for='radiusSelect'><?php _e($sl_radius_label, SLPLUS_PREFIX);?></label>
-                <select id='radiusSelect'><?php echo $r_options;?></select>
+                <select id='radiusSelect'><?php echo $slplus_plugin->data['radius_options'];?></select>
             </div>
 
         <?php
         } else {
-            echo $r_options;
+            echo $slplus_plugin->data['radius_options'];
         }
         global $slp_thishtml_70;
         $slp_thishtml_70 = ob_get_clean();

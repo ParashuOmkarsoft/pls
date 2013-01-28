@@ -11,6 +11,16 @@ add_filter('wpcf_fields_form_additional_filters',
 add_action('wpcf_save_group', 'wpcf_cd_save_group_action');
 add_action('admin_footer', 'wpcf_cd_admin_form_js');
 
+global $wp_version;
+$wpcf_button_style='';
+$wpcf_button_style30='';
+
+if (version_compare($wp_version,'3.5','<'))
+{
+    $wpcf_button_style='style="line-height: 35px;"';
+    $wpcf_button_style30='style="line-height: 30px;"';
+}
+
 /**
  * Filters group field form.
  * 
@@ -59,6 +69,8 @@ function wpcf_cd_field_pre_save_filter($data) {
  * @return type 
  */
 function wpcf_cd_admin_form_filter($data, $group = false) {
+    global $wpcf_button_style30;
+    
     if ($group) {
         $name = 'wpcf[group][conditional_display]';
     } else {
@@ -76,12 +88,12 @@ function wpcf_cd_admin_form_filter($data, $group = false) {
     } else {
         $form['cd']['wrap'] = array(
             '#type' => 'markup',
-            '#markup' => '<strong>' . __('Data-dependent display filters',
+            '#markup' => '<br /><strong>' . __('Data-dependent display filters',
                     'wpcf') . '</strong><br />'
             . __("Specify additional filters that control this group's display, based on values of custom fields.",
                     'wpcf')
-            . '<br /><a class="button-secondary" onclick="jQuery(this).css(\'visibility\',\'hidden\').next().slideToggle();" style="line-height: 30px;" href="javascript:void(0);">'
-            . __('Edit') . '</a><div id="wpcf-cd-group" style="display:none;">',
+            . '<br /><br /><a class="button-secondary" onclick="jQuery(this).css(\'visibility\',\'hidden\').next().slideToggle();" '.$wpcf_button_style30.'  href="javascript:void(0);">'
+            . __('Edit', 'wpcf') . '</a><div id="wpcf-cd-group" style="display:none;">',
         );
     }
     if (!empty($data['data']['conditional_display']['conditions'])) {
@@ -93,7 +105,7 @@ function wpcf_cd_admin_form_filter($data, $group = false) {
     $add = $group ? 'true' : 'false';
     $form['cd']['add'] = array(
         '#type' => 'markup',
-        '#markup' => '<br /><a class="wpcf-ajax-link button-secondary" onclick="wpcfCdAddCondition(jQuery(this),' . $add . ');" href="javascript:void(0);">'
+        '#markup' => '<a class="wpcf-ajax-link button-secondary" onclick="wpcfCdAddCondition(jQuery(this),' . $add . ');" href="javascript:void(0);">'
         . __('Add condition', 'wpcf') . '</a><br /><br /><div class="wpcf-cd-entries">',
     );
     if (!empty($data['data']['conditional_display']['conditions'])) {
@@ -137,7 +149,7 @@ function wpcf_cd_admin_form_filter($data, $group = false) {
     $form['cd']['customize_display_logic_link'] = array(
         '#type' => 'markup',
         '#markup' => '<a href="javascript:void(0);" class="button-secondary wpcf-cd-enable-custom-mode" onclick="window.wpcfCdState_' . md5($data['id'])
-        . ' = jQuery(\'#' . md5($data['id']) . '_cd_summary\').val();' . $prepopulate . ' jQuery(\'#' . md5($data['id']) . '_cd_summary\').parent().slideDown(); jQuery(this).hide().next().show();">'
+        . ' = jQuery(\'#' . md5($data['id']) . '_cd_summary\').val();' . $prepopulate . ' jQuery(\'#' . md5($data['id']) . '_cd_summary\').parent().slideDown(); jQuery(this).hide().next().show();wpcfCdCheckDateCustomized(jQuery(this));">'
         . __('Customize the display logic', 'wpcf')
         . '</a>',
     );
@@ -170,6 +182,11 @@ function wpcf_cd_admin_form_filter($data, $group = false) {
         '#default_value' => isset($data['data']['conditional_display']['custom_use']),
         '#after' => '',
     );
+    $form['cd']['date_notice'] = array(
+        '#type' => 'markup',
+        '#markup' => '<div style="display:none; margin-top:15px;" class="wpcf-cd-notice-date">'
+        . sprintf(__('%sDates can be entered using the date filters &raquo;%s', 'wpcf'), '<a href="http://wp-types.com/documentation/user-guides/date-filters/" target="_blank">', '</a>') . '</div>',
+    );
     $form['cd']['apply_display_logic_link'] = array(
         '#type' => 'markup',
         '#markup' => '<br /><br /><a href="javascript:void(0);" class="button-primary" onclick="window.wpcfCdState_' . md5($data['id'])
@@ -199,7 +216,7 @@ function wpcf_cd_admin_form_filter($data, $group = false) {
     if ($group) {
         $form['cd']['wrap_close'] = array(
             '#type' => 'markup',
-            '#markup' => '<br /><a class="button-primary" onclick="jQuery(this).parent().slideUp().prev().css(\'visibility\',\'visible\');" style="line-height: 30px;" href="javascript:void(0);">'
+            '#markup' => '<br /><a class="button-primary" onclick="jQuery(this).parent().slideUp().prev().css(\'visibility\',\'visible\');" '.$wpcf_button_style30.'  href="javascript:void(0);">'
             . __('OK', 'wpcf') . '</a></div>',
         );
     }
@@ -235,7 +252,11 @@ function wpcf_cd_admin_form_single_filter($data, $condition, $key = null,
         if (wpcf_admin_is_repetitive($field)) {
             continue;
         }
-        $options[$field['name']] = $field_id;
+        $options[$field_id] = array(
+            '#value' => $field_id,
+            '#title' => stripslashes($field['name']),
+            '#attributes' => array('class' => 'wpcf-conditional-select-' . $field['type']),
+        );
     }
     if (!$group && empty($options)) {
         return array(
@@ -246,7 +267,7 @@ function wpcf_cd_admin_form_single_filter($data, $condition, $key = null,
             )
         );
     }
-    $id = !is_null($key) ? $key : strval('condition_' . mt_rand());
+    $id = !is_null($key) ? $key : strval('condition_' . wpcf_unique_id(serialize($data) . serialize($condition) . $key . $group));
     $form = array();
     $before = '<div class="wpcf-cd-entry"><br />';
     $form['cd']['field_' . $id] = array(
@@ -294,7 +315,7 @@ function wpcf_cd_admin_form_single_filter($data, $condition, $key = null,
  */
 function wpcf_cd_fields_form_additional_filters($filters, $update) {
     $data = array();
-    $data['id'] = !empty($update) ? $update['name'] : mt_rand();
+    $data['id'] = !empty($update) ? $update['name'] : wpcf_unique_id(serialize($filters));
     if ($update) {
         $data['data']['conditional_display'] = get_post_meta($update['id'],
                 '_wpcf_conditional_display', true);

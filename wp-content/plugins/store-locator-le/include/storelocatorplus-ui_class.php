@@ -123,7 +123,7 @@ if (! class_exists('SLPlus_UI')) {
             $content =
                 ($hidden?'':"<div id='$divID' class='search_item'>") .
                     (($hidden || ($label === '')) ? '' : "<label for='$fldID'>$label</label>") .
-                    "<input type='".($hidden?'hidden':'text')."' id='$fldID' placeholder='$placeholder' size='50' value='' />" .
+                    "<input type='".($hidden?'hidden':'text')."' id='$fldID' name='$fldID' placeholder='$placeholder' size='50' value='' />" .
                 ($hidden?'':"</div>")
                 ;
             return $content;
@@ -135,7 +135,7 @@ if (! class_exists('SLPlus_UI')) {
          * @param array $shortcodes
          * @return array
          */
-        function no_texturize_shortcodes($shortcodes) {
+        static function no_texturize_shortcodes($shortcodes) {
            return array_merge($shortcodes,
                     array(
                      'STORE-LOCATOR',
@@ -161,7 +161,6 @@ if (! class_exists('SLPlus_UI')) {
          * @global type $slplus_plugin
          * @global type $sl_search_label
          * @global type $sl_radius_label
-         * @global type $r_options
          * @global type $cs_options
          * @global type $sl_country_options
          * @global type $slplus_state_options
@@ -171,7 +170,7 @@ if (! class_exists('SLPlus_UI')) {
          */
          function render_shortcode($attributes, $content = null) {
             global  $wpdb, $slplus_plugin,
-                $sl_search_label, $sl_radius_label, $r_options, $cs_options,
+                $sl_search_label, $sl_radius_label, $cs_options,
                 $sl_country_options, $slplus_state_options;
 
 
@@ -190,7 +189,8 @@ if (! class_exists('SLPlus_UI')) {
             $sl_search_label   = get_option('sl_search_label',__('Address',SLPLUS_PREFIX));
             $unit_display      = get_option('sl_distance_unit','mi');
 
-            $r_options      =(isset($r_options)         ?$r_options      :'');
+            $slplus_plugin->data['radius_options'] =
+                    (isset($slplus_plugin->data['radius_options'])?$slplus_plugin->data['radius_options']:'');
             $cs_options     =(isset($cs_options)        ?$cs_options     :'');
             $sl_country_options=(isset($sl_country_options)   ?$sl_country_options:'');
             $slplus_state_options=(isset($slplus_state_options)   ?$slplus_state_options:'');
@@ -203,7 +203,8 @@ if (! class_exists('SLPlus_UI')) {
             if (get_option(SLPLUS_PREFIX.'_hide_radius_selections', 0) == 1) {
                 preg_match('/\((.*?)\)/', $radiusSelections, $selectedRadius);
                 $selectedRadius = preg_replace('/[^0-9]/', '', (isset($selectedRadius[1])?$selectedRadius[1]:$radiusSelections));
-                $r_options = "<input type='hidden' id='radiusSelect' name='radiusSelect' value='$selectedRadius'>";
+                $slplus_plugin->data['radius_options'] =
+                        "<input type='hidden' id='radiusSelect' name='radiusSelect' value='$selectedRadius'>";
 
             // Build Pulldown
             } else {
@@ -211,7 +212,8 @@ if (! class_exists('SLPlus_UI')) {
                 foreach ($radiusSelectionArray as $radius) {
                     $selected=(preg_match('/\(.*\)/', $radius))? " selected='selected' " : "" ;
                     $radius=preg_replace('/[^0-9]/', '', $radius);
-                    $r_options.="<option value='$radius' $selected>$radius $unit_display</option>";
+                    $slplus_plugin->data['radius_options'].=
+                            "<option value='$radius' $selected>$radius $unit_display</option>";
                 }
             }
 
@@ -451,7 +453,7 @@ if (! class_exists('SLPlus_UI')) {
         /**
          * Render the search form for the map.
          */
-        function slp_render_search_form() {
+        static function slp_render_search_form() {
             global $slplus_plugin;
             echo apply_filters('slp_search_form_html',$slplus_plugin->helper->get_string_from_phpexec(SLPLUS_COREDIR . 'templates/search_form.php'));
         }
@@ -460,7 +462,7 @@ if (! class_exists('SLPlus_UI')) {
          * Render the SLP map
          *
          */
-        function render_the_map() {
+        static function render_the_map() {
             global $slplus_plugin;
 
              $slplus_plugin->helper->loadPluginData();
@@ -527,6 +529,7 @@ if (! class_exists('SLPlus_UI')) {
                         '"'.
                     '>'.
                     __('search provided by', 'csl-slplus') .
+                    ' ' .
                     "<a href='". $slplus_plugin->url."' target='_blank'>".
                          $slplus_plugin->name.
                     "</a>".

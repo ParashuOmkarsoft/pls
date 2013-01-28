@@ -21,6 +21,9 @@ if (defined('SLPLUS_PLUGINDIR')) {
     global $slplus_plugin;
     $slplus_plugin = new wpCSL_plugin__slplus(
         array(
+            'on_update' => array('SLPlus_Activate', 'update'),
+            'version' => '3.8.12',
+
 
             // Plugin data elements, helps make data lookups more efficient
             //
@@ -79,9 +82,6 @@ if (defined('SLPLUS_PLUGINDIR')) {
             'name'                  => 'Store Locator Plus',
             'sku'                   => 'SLPLUS',
             'admin_slugs'           => array('slp_general_settings'),
-
-            'on_update' => array('SLPlus_Activate', 'update'),
-            'version' => '3.8.6',
 
             'url'                   => 'http://www.charlestonsw.com/product/store-locator-plus-2/',            
             'support_url'           => 'http://www.charlestonsw.com/support/documentation/store-locator-plus/',

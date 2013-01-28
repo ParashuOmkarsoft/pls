@@ -4,8 +4,8 @@ Contributors: charlestonsw
 Donate link: http://www.charlestonsw.com/product/store-locator-plus-2/
 Tags: google maps, store finder, store locator, store locater, google, dealer locator, dealer locater, zip code search, shop locator, shop finder, zipcode, location finder, places, stores, maps, mapping, mapper, plugin, posts, post, page, coordinates, latitude, longitude, geo, geocoding, shops, ecommerce, e-commerce, business locations, store locator plus, store locater plus, bing map, bing, yahoo maps, yahoo, mapping, retail
 Requires at least: 3.3
-Tested up to: 3.5
-Stable tag: 3.8.6
+Tested up to: 3.5.1
+Stable tag: 3.8.12
 
 Store Locator Plus makes it easy to put a fully functional store finder on your site.
 The most active store locator plugin with monthly updates!
@@ -164,8 +164,39 @@ Thanks to [Nicolas Mollet](http://mapicons.nicolasmollet.com/) and Icons-Land (h
 
 Thanks to [Google](http://www.google.com) for the maps engine as well as some of the icons.  Some of the Google open-source icons are found [at this unofficial list](http://www.visual-case.it/cgi-bin/vc/GMapsIcons.pl).
 
+Thanks to "PennyGrit" for pointing out security issues so I can patch them before the exploit gets into the wild.
+
 
 == Frequently Asked Questions ==
+
+= Upgrade Notice =
+
+3.8.6 update notice.
+
+I have been chasing down some nasty icon (map marker) setting bugs.
+Turns out the icons were stored in TWO locations.
+Most icons were in both places.
+Most places in the code referenced a single location (under ./core/images/icons).
+Not EVERYPLACE in the code did so.
+
+Rather than hold up 3.8.6 to make a "perfect patch" I have released this version
+with the ability to change/save new home/end icons, save the map height and width,
+and a few other settings.
+
+YOU WILL LIKELY NEED TO RE-SET YOUR HOME AND END ICONS.
+
+I cleaned things up and moved all the map marker icons to ./images/icons.
+
+I also fixed the "save custom icons" which runs automatically when updating to a new version.
+If you store custom icons in ./core/images/icons or ./images/icons they are now copied to
+./wp-content/uploads/slp/saved-icons/.    This may result in a duplicate list of icons in
+your icon selector on map settings.   I will at least prevent icons that are in the core
+plugin from being copied over in a future release.  For now you may see double icons
+in the list.  I think this is better than not saving them at all (older versions) or
+not letting people save their map width/height and/or change the map marker icons.
+
+Again: YOU WILL LIKELY NEED TO RE-SET YOUR HOME AND END ICONS.
+
 
 = What is included in the plugin? =
 
@@ -252,35 +283,6 @@ The website offers [more screen shots](http://www.charlestonsw.com/product/store
 
 More screenshots are available via [the CSA website](http://www.charlestonsw.com/products/store-locator-plus/).
 
-== Update Notice ==
-
-3.8.6 update notice.
-
-I have been chasing down some nasty icon (map marker) setting bugs.
-Turns out the icons were stored in TWO locations.
-Most icons were in both places.
-Most places in the code referenced a single location (under ./core/images/icons).
-Not EVERYPLACE in the code did so.
-
-Rather than hold up 3.8.6 to make a "perfect patch" I have released this version
-with the ability to change/save new home/end icons, save the map height and width,
-and a few other settings.
-
-YOU WILL LIKELY NEED TO RE-SET YOUR HOME AND END ICONS.
-
-I cleaned things up and moved all the map marker icons to ./images/icons.
-
-I also fixed the "save custom icons" which runs automatically when updating to a new version.
-If you store custom icons in ./core/images/icons or ./images/icons they are now copied to
-./wp-content/uploads/slp/saved-icons/.    This may result in a duplicate list of icons in
-your icon selector on map settings.   I will at least prevent icons that are in the core
-plugin from being copied over in a future release.  For now you may see double icons
-in the list.  I think this is better than not saving them at all (older versions) or
-not letting people save their map width/height and/or change the map marker icons.
-
-Again: YOU WILL LIKELY NEED TO RE-SET YOUR HOME AND END ICONS.
-
-
 == Changelog ==
 
 I update about once per month or more frequently as needed.
@@ -288,6 +290,36 @@ I update about once per month or more frequently as needed.
 Visit the [Store Locator Plus Release Notes page](http://www.charlestonsw.com/support/documentation/store-locator-plus/release-notes/) for the full change log.
 
 I was listing the entire change log here but with weekly/bi-weekly updates it as getting much too long.
+
+= 3.8.12 (January XX 2013) =
+
+* Roles & Capabilities updates, must now be administrator to see SLP sidebar menu entries.
+* [Pro Pack](http://www.charlestonsw.com/product/store-locator-plus) : Fix name field searches.
+* Start getting search form to send ALL form vars for better back end search functions in the future.
+
+= 3.8.11 (January 25 2013) =
+
+* [Pro Pack](http://www.charlestonsw.com/product/store-locator-plus) : Add "skip duplicates" on bulk upload.
+* WP 3.5.1 compatibility testing
+
+= 3.8.10 (January 23 2013) =
+
+* [Pro Pack](http://www.charlestonsw.com/product/store-locator-plus) : Add "skip first line" to bulk upload.
+* Trap JavaScript panTo error if home point on map is not defined.
+
+= 3.8.9 (January 21 2013) =
+
+* Added Bahamas as a Google Maps domain
+
+= 3.8.8 (January 11th 2013) =
+
+* Minor change to how the radius pulldown string is built, maybe stops issue with duplicate entries for some people?
+* Change how I test if I am on my dev box before turning on PHP report ALL errrors & warnings.
+
+= 3.8.7 (January 9th 2013) =
+
+* Security patch for slp-pro.php to prevent open query/injection attack.
+* Icon save/select eliminate duplicates. Base file name must be unique.  Base plugin icons take precedence.
 
 = 3.8.6 (January 7th 2013) =
 
