@@ -33,7 +33,7 @@
 					<?php endforeach; ?>
 				<?php endif; ?>
 				
-				<div class="row">
+				<div class="row-fluid">
 				
 					<div class="span7">
 						
